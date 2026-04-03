@@ -230,7 +230,7 @@ export function extractComponents(
       tokens: matchAppliedTokens(candidate.node, tokens),
       autoLayout: inferAutoLayout(candidate.node),
       cornerRadius: normalizeLength(candidate.node.borderRadius) ?? undefined,
-      textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 40 ? t : undefined; })()
+      textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })()
     };
   });
 }
@@ -321,6 +321,12 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     /\b(btn|button|cta)\b/.test(haystack) ||
     (node.tagName === "a" && Boolean(node.backgroundColor))
   ) {
+    // Reject if the text looks like informational content, not an action label.
+    // Real button labels are short, have no commas, and don't contain digits like IDs.
+    const text = (node.textContent ?? "").trim();
+    if (text.length > 30 || text.includes(",") || /\d{4,}/.test(text)) {
+      return "Unknown";
+    }
     return "Button";
   }
 
