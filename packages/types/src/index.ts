@@ -361,6 +361,10 @@ export interface ExtractedComponent extends ComponentBase {
    */
   autoLayout?: AutoLayout;
   /**
+   * Corner radius in pixels extracted from the DOM element.
+   */
+  cornerRadius?: PixelValue;
+  /**
    * Nested child components extracted from the same subtree.
    */
   children?: ExtractedComponent[];

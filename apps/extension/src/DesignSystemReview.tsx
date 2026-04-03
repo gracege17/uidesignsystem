@@ -450,11 +450,12 @@ function ComponentPreview({
   };
 
   if (component.type === "Button" || component.type === "Badge") {
+    const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
     return (
       <button
         type="button"
-        className={`w-fit rounded-full ${variantStyle === "ghost" ? "border-0" : "border"}`}
-        style={style}
+        className={`w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`}
+        style={{ ...style, borderRadius }}
       >
         {component.type}
       </button>

@@ -228,7 +228,8 @@ export function extractComponents(
           : "Detected from a strong structural component signal.",
       variants,
       tokens: matchAppliedTokens(candidate.node, tokens),
-      autoLayout: inferAutoLayout(candidate.node)
+      autoLayout: inferAutoLayout(candidate.node),
+      cornerRadius: normalizeLength(candidate.node.borderRadius) ?? undefined
     };
   });
 }

@@ -123,7 +123,8 @@ function ComponentPreview({ component, tokens, theme }) {
         ...paddingStyle
     };
     if (component.type === "Button" || component.type === "Badge") {
-        return (_jsx("button", { type: "button", className: `w-fit rounded-full ${variantStyle === "ghost" ? "border-0" : "border"}`, style: style, children: component.type }));
+        const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
+        return (_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: component.type }));
     }
     if (component.type === "Navigation") {
         return (_jsxs("div", { className: "flex items-center gap-4 rounded-full border px-5 py-3 text-sm", style: style, children: [_jsx("span", { children: "Overview" }), _jsx("span", { className: "opacity-60", children: "Pricing" }), _jsx("span", { className: "opacity-60", children: "Docs" })] }));
