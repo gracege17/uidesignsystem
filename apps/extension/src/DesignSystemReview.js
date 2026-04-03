@@ -105,7 +105,7 @@ function ComponentPreview({ component, tokens, theme }) {
     const previewTextColor = getReadableTextColor(variantStyle === "outline" || variantStyle === "ghost"
         ? (theme === "light" ? "#ffffff" : "#0f172a")
         : resolvedBackground, text ?? (variantStyle !== "fill" ? (fill ?? stroke) : undefined), theme);
-    const padding = component.autoLayout?.padding;
+    const padding = component.padding ?? component.autoLayout?.padding;
     const paddingStyle = padding
         ? {
             paddingTop: `${padding.top}px`,
@@ -127,13 +127,16 @@ function ComponentPreview({ component, tokens, theme }) {
         const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
         const rawText = component.textContent ?? "";
         const label = rawText.length > 0 && rawText.length <= 30 ? rawText : component.type;
-        const pad = component.autoLayout?.padding;
+        const pad = component.padding ?? component.autoLayout?.padding;
         const specs = [];
-        if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
-        if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
-        if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+        if (type)
+            specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+        if (pad)
+            specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
+        if (component.cornerRadius !== undefined)
+            specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
         specs.push({ label: "Size", value: component.variants.size });
-        return (_jsxs("div", { className: "space-y-4", children: [_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: label }), specs.length > 0 && _jsx("div", { className: "space-y-1.5", children: specs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[56px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) })] }));
+        return (_jsxs("div", { className: "space-y-4", children: [_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: label }), specs.length > 0 && (_jsx("div", { className: "space-y-1.5", children: specs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[56px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) }))] }));
     }
     if (component.type === "Navigation") {
         return (_jsxs("div", { className: "flex items-center gap-4 rounded-full border px-5 py-3 text-sm", style: style, children: [_jsx("span", { children: "Overview" }), _jsx("span", { className: "opacity-60", children: "Pricing" }), _jsx("span", { className: "opacity-60", children: "Docs" })] }));

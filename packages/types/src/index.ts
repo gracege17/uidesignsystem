@@ -365,6 +365,10 @@ export interface ExtractedComponent extends ComponentBase {
    */
   cornerRadius?: PixelValue;
   /**
+   * Padding extracted from the DOM element, independent of auto-layout.
+   */
+  padding?: Spacing;
+  /**
    * Visible text content of the component, if present.
    */
   textContent?: string;

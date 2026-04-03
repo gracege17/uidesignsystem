@@ -430,7 +430,7 @@ function ComponentPreview({
     theme
   );
 
-  const padding = component.autoLayout?.padding;
+  const padding = component.padding ?? component.autoLayout?.padding;
   const paddingStyle = padding
     ? {
         paddingTop: `${padding.top}px`,
@@ -454,7 +454,7 @@ function ComponentPreview({
     const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
     const rawText = component.textContent ?? "";
     const label = rawText.length > 0 && rawText.length <= 30 ? rawText : component.type;
-    const pad = component.autoLayout?.padding;
+    const pad = component.padding ?? component.autoLayout?.padding;
     const specs: { label: string; value: string }[] = [];
     if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
     if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });

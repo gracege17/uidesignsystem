@@ -230,6 +230,7 @@ export function extractComponents(
       tokens: matchAppliedTokens(candidate.node, tokens),
       autoLayout: inferAutoLayout(candidate.node),
       cornerRadius: normalizeLength(candidate.node.borderRadius) ?? undefined,
+      padding: inferPadding(candidate.node),
       textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })()
     };
   });
@@ -418,6 +419,15 @@ function matchAppliedTokens(node: SerializedStyleNode, tokens: DesignTokens): Ex
     typography: typographyToken ? [typographyToken.id] : [],
     effects: effectTokenIds
   };
+}
+
+function inferPadding(node: SerializedStyleNode): AutoLayout["padding"] | undefined {
+  const top = normalizeLength(node.paddingTop) ?? 0;
+  const right = normalizeLength(node.paddingRight) ?? 0;
+  const bottom = normalizeLength(node.paddingBottom) ?? 0;
+  const left = normalizeLength(node.paddingLeft) ?? 0;
+  if (top === 0 && right === 0 && bottom === 0 && left === 0) return undefined;
+  return { top, right, bottom, left };
 }
 
 function inferAutoLayout(node: SerializedStyleNode): AutoLayout | undefined {
