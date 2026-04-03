@@ -124,7 +124,8 @@ function ComponentPreview({ component, tokens, theme }) {
     };
     if (component.type === "Button" || component.type === "Badge") {
         const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
-        const label = component.textContent ?? component.type;
+        const rawText = component.textContent ?? "";
+        const label = rawText.length > 0 && rawText.length <= 40 ? rawText : component.type;
         return (_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: label }));
     }
     if (component.type === "Navigation") {

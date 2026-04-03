@@ -230,7 +230,7 @@ export function extractComponents(
       tokens: matchAppliedTokens(candidate.node, tokens),
       autoLayout: inferAutoLayout(candidate.node),
       cornerRadius: normalizeLength(candidate.node.borderRadius) ?? undefined,
-      textContent: candidate.node.textContent?.trim() || undefined
+      textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 40 ? t : undefined; })()
     };
   });
 }
