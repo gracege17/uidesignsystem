@@ -96,19 +96,39 @@ function ComponentPreview({ component, tokens, theme }) {
     const stroke = tokens.colors.find((token) => component.tokens.strokes.includes(token.id))?.value;
     const text = tokens.colors.find((token) => component.tokens.text.includes(token.id))?.value;
     const type = tokens.typography.find((token) => component.tokens.typography.includes(token.id));
-    const resolvedBackground = fill ?? (theme === "light" ? "#ffffff" : "#0f172a");
-    const resolvedBorder = stroke ?? (theme === "light" ? "#d4d4d8" : "#334155");
-    const previewTextColor = getReadableTextColor(resolvedBackground, text, theme);
+    const variantStyle = component.variants.style;
+    const resolvedBackground =
+        variantStyle === "outline" || variantStyle === "ghost"
+            ? "transparent"
+            : (fill ?? (theme === "light" ? "#ffffff" : "#0f172a"));
+    const resolvedBorder = stroke ?? fill ?? (theme === "light" ? "#d4d4d8" : "#334155");
+    const previewTextColor = getReadableTextColor(
+        variantStyle === "outline" || variantStyle === "ghost"
+            ? (theme === "light" ? "#ffffff" : "#0f172a")
+            : resolvedBackground,
+        text ?? (variantStyle !== "fill" ? (fill ?? stroke) : undefined),
+        theme
+    );
+    const padding = component.autoLayout?.padding;
+    const paddingStyle = padding
+        ? {
+            paddingTop: `${padding.top}px`,
+            paddingRight: `${padding.right}px`,
+            paddingBottom: `${padding.bottom}px`,
+            paddingLeft: `${padding.left}px`
+        }
+        : { padding: "10px 20px" };
     const style = {
         backgroundColor: resolvedBackground,
-        borderColor: resolvedBorder,
+        borderColor: variantStyle === "ghost" ? "transparent" : resolvedBorder,
         color: previewTextColor,
         fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
         fontSize: type ? `${Math.min(type.fontSize, 18)}px` : undefined,
-        fontWeight: type?.fontWeight
+        fontWeight: type?.fontWeight,
+        ...paddingStyle
     };
     if (component.type === "Button" || component.type === "Badge") {
-        return (_jsx("button", { type: "button", className: "rounded-full border px-5 py-2.5 text-sm", style: style, children: component.type }));
+        return (_jsx("button", { type: "button", className: `rounded-full ${variantStyle === "ghost" ? "border-transparent" : "border"}`, style: style, children: component.type }));
     }
     if (component.type === "Navigation") {
         return (_jsxs("div", { className: "flex items-center gap-4 rounded-full border px-5 py-3 text-sm", style: style, children: [_jsx("span", { children: "Overview" }), _jsx("span", { className: "opacity-60", children: "Pricing" }), _jsx("span", { className: "opacity-60", children: "Docs" })] }));
