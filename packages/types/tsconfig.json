@@ -1,0 +1,9 @@
+{
+  "extends": "@extractor/config/tsconfig/base",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}

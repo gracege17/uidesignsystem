@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Design Extractor",
+  "description": "Prototype Chrome extension for extracting design tokens from a page.",
+  "version": "0.0.0",
+  "action": {
+    "default_title": "Design Extractor",
+    "default_popup": "index.html"
+  },
+  "permissions": ["activeTab", "scripting", "storage"]
+}
