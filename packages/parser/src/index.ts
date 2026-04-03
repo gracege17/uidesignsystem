@@ -229,7 +229,8 @@ export function extractComponents(
       variants,
       tokens: matchAppliedTokens(candidate.node, tokens),
       autoLayout: inferAutoLayout(candidate.node),
-      cornerRadius: normalizeLength(candidate.node.borderRadius) ?? undefined
+      cornerRadius: normalizeLength(candidate.node.borderRadius) ?? undefined,
+      textContent: candidate.node.textContent?.trim() || undefined
     };
   });
 }
@@ -367,7 +368,11 @@ function inferComponentVariants(node: SerializedStyleNode): ComponentVariants {
   if (hasStroke && !hasFill) {
     style = "outline";
   } else if (!hasFill && !hasStroke) {
-    style = "ghost";
+    // If text color is light/white, the element almost certainly sits on a
+    // colored fill that the serializer didn't capture (e.g. applied via
+    // pseudo-element or CSS class on a child). Treat as fill rather than ghost.
+    const textLuminance = getLuminanceFromColor(node.textColor);
+    style = textLuminance !== null && textLuminance > 0.7 ? "fill" : "ghost";
   }
 
   const lowerSource = node.source.toLowerCase();
@@ -1104,6 +1109,17 @@ function parseLengthToken(value: string): number | null {
 
 function roundValue(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function getLuminanceFromColor(value: string | undefined): number | null {
+  if (!value) return null;
+  const channels = parseColorChannels(value);
+  if (!channels) return null;
+  const linearize = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * linearize(channels.r) + 0.7152 * linearize(channels.g) + 0.0722 * linearize(channels.b);
 }
 
 function parseColorChannels(value: string): { r: number; g: number; b: number } | null {

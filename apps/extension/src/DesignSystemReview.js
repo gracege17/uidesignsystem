@@ -124,7 +124,8 @@ function ComponentPreview({ component, tokens, theme }) {
     };
     if (component.type === "Button" || component.type === "Badge") {
         const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
-        return (_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: component.type }));
+        const label = component.textContent ?? component.type;
+        return (_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: label }));
     }
     if (component.type === "Navigation") {
         return (_jsxs("div", { className: "flex items-center gap-4 rounded-full border px-5 py-3 text-sm", style: style, children: [_jsx("span", { children: "Overview" }), _jsx("span", { className: "opacity-60", children: "Pricing" }), _jsx("span", { className: "opacity-60", children: "Docs" })] }));
@@ -214,22 +215,10 @@ function inferColumns(component) {
     return 1;
 }
 function isNeutralColor(value) {
-    let r, g, b;
-    const hexMatch = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-    if (hexMatch) {
-        const hex = hexMatch[1];
-        const normalized = hex.length === 3
-            ? hex.split("").map((part) => `${part}${part}`).join("")
-            : hex;
-        r = Number.parseInt(normalized.slice(0, 2), 16);
-        g = Number.parseInt(normalized.slice(2, 4), 16);
-        b = Number.parseInt(normalized.slice(4, 6), 16);
-    } else {
-        const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-        if (!match)
-            return false;
-        [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])];
-    }
+    const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (!match)
+        return false;
+    const [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])];
     return Math.abs(r - g) < 12 && Math.abs(g - b) < 12;
 }
 function getReadableTextColor(backgroundColor, preferredTextColor, theme) {
@@ -239,10 +228,8 @@ function getReadableTextColor(backgroundColor, preferredTextColor, theme) {
     if (preferredTextColor) {
         const preferredLuminance = getColorLuminance(preferredTextColor);
         if (backgroundLuminance !== null && preferredLuminance !== null) {
-            const lighter = Math.max(backgroundLuminance, preferredLuminance);
-            const darker = Math.min(backgroundLuminance, preferredLuminance);
-            const contrastRatio = (lighter + 0.05) / (darker + 0.05);
-            if (contrastRatio >= 4.5) {
+            const contrast = Math.abs(backgroundLuminance - preferredLuminance);
+            if (contrast >= 0.42) {
                 return preferredTextColor;
             }
         }
@@ -271,21 +258,14 @@ function getColorLuminance(color) {
         const r = Number.parseInt(normalized.slice(0, 2), 16);
         const g = Number.parseInt(normalized.slice(2, 4), 16);
         const b = Number.parseInt(normalized.slice(4, 6), 16);
-        return toRelativeLuminance(r, g, b);
+        return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
     }
     const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
     if (!match) {
         return null;
     }
     const [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])];
-    return toRelativeLuminance(r, g, b);
-}
-function toRelativeLuminance(r, g, b) {
-    const linearize = (channel) => {
-        const sRGB = channel / 255;
-        return sRGB <= 0.04045 ? sRGB / 12.92 : Math.pow((sRGB + 0.055) / 1.055, 2.4);
-    };
-    return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }
 function getThemeClasses(theme) {
     if (theme === "dark") {

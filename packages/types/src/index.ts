@@ -365,6 +365,10 @@ export interface ExtractedComponent extends ComponentBase {
    */
   cornerRadius?: PixelValue;
   /**
+   * Visible text content of the component, if present.
+   */
+  textContent?: string;
+  /**
    * Nested child components extracted from the same subtree.
    */
   children?: ExtractedComponent[];
