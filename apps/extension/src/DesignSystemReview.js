@@ -55,15 +55,22 @@ function ColorSection({ tokens, summary, theme }) {
 }
 function TypographySection({ tokens, summary, theme }) {
     const ui = getThemeClasses(theme);
+    const seenIds = new Set();
     const scale = [
         summary.h1 ? { role: "H1", token: summary.h1 } : null,
         summary.h2 ? { role: "H2", token: summary.h2 } : null,
         summary.h3 ? { role: "H3", token: summary.h3 } : null,
         summary.body ? { role: "Body", token: summary.body } : null,
         summary.caption ? { role: "Caption", token: summary.caption } : null,
-    ].filter((entry) => Boolean(entry));
+    ].filter((entry) => {
+        if (!entry)
+            return false;
+        if (seenIds.has(entry.token.id))
+            return false;
+        seenIds.add(entry.token.id);
+        return true;
+    });
     return (_jsxs("div", { className: "space-y-8", children: [_jsx("div", { className: `${ui.heroPanel} grid gap-10 ${summary.fontFamilies.length > 1 ? "md:grid-cols-2" : ""}`, children: summary.fontFamilies.length === 0 ? (_jsxs("div", { children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Typeface" }), _jsx("p", { className: `mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: "\u2014" })] })) : summary.fontFamilies.map((family) => (_jsxs("div", { children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Typeface" }), _jsx("p", { className: `mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: family })] }, family))) }), _jsx("div", { className: "space-y-8", children: scale.map(({ role, token }) => (_jsxs("div", { className: `border-t pt-6 ${ui.rule}`, children: [_jsxs("div", { className: `mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: [_jsxs("span", { children: [role, " \u2014 ", token.fontFamily] }), _jsx("span", { children: "Font Size" }), _jsx("span", { children: "Line Height" })] }), _jsxs("div", { className: "grid grid-cols-[minmax(0,1fr)_100px_100px] gap-4", children: [_jsx("p", { className: `pr-6 ${ui.headingText}`, style: {
-                                        fontFamily: `"${token.fontFamily}", sans-serif`,
                                         fontSize: `${Math.min(token.fontSize, 64)}px`,
                                         lineHeight: `${Math.min(token.lineHeight, 72)}px`,
                                         fontWeight: token.fontWeight,
@@ -133,9 +140,11 @@ function buildSummary(result) {
     const caption = [...result.tokens.typography]
         .filter((token) => token.fontSize < 14)
         .sort((left, right) => right.fontSize - left.fontSize)[0];
+    // Headings must be > 20px so they never overlap with body or caption
+    const headings = typography.filter((token) => token.fontSize > 20);
     const primaryColors = result.tokens.colors.filter((token) => (token.role === "fill" || token.role === "text") && !isNeutralColor(token.value));
     const neutralColors = result.tokens.colors.filter((token) => isNeutralColor(token.value));
-    const accentColors = result.tokens.colors.filter((token) => !primaryColors.includes(token) && !neutralColors.includes(token));
+    const accentColors = result.tokens.colors.filter((token) => !primaryColors.includes(token) && !neutralColors.includes(token) && token.role !== "stroke");
     const familyCounts = result.components.reduce((accumulator, component) => {
         accumulator[component.type] = (accumulator[component.type] ?? 0) + 1;
         return accumulator;
@@ -157,11 +166,11 @@ function buildSummary(result) {
             components: result.components.length
         },
         primaryColor: primaryColors[0] ?? result.tokens.colors[0],
-        mainTypography: typography[0] ?? body,
+        mainTypography: headings[0] ?? body,
         fontFamilies,
-        h1: typography[0],
-        h2: typography[1],
-        h3: typography[2],
+        h1: headings[0],
+        h2: headings[1],
+        h3: headings[2],
         body,
         caption,
         componentFamilies: Object.entries(familyCounts)
@@ -189,10 +198,22 @@ function inferColumns(component) {
     return 1;
 }
 function isNeutralColor(value) {
-    const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-    if (!match)
-        return false;
-    const [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])];
+    let r, g, b;
+    const hexMatch = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hexMatch) {
+        const hex = hexMatch[1];
+        const normalized = hex.length === 3
+            ? hex.split("").map((part) => `${part}${part}`).join("")
+            : hex;
+        r = Number.parseInt(normalized.slice(0, 2), 16);
+        g = Number.parseInt(normalized.slice(2, 4), 16);
+        b = Number.parseInt(normalized.slice(4, 6), 16);
+    } else {
+        const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+        if (!match)
+            return false;
+        [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])];
+    }
     return Math.abs(r - g) < 12 && Math.abs(g - b) < 12;
 }
 function getReadableTextColor(backgroundColor, preferredTextColor, theme) {
@@ -202,8 +223,10 @@ function getReadableTextColor(backgroundColor, preferredTextColor, theme) {
     if (preferredTextColor) {
         const preferredLuminance = getColorLuminance(preferredTextColor);
         if (backgroundLuminance !== null && preferredLuminance !== null) {
-            const contrast = Math.abs(backgroundLuminance - preferredLuminance);
-            if (contrast >= 0.42) {
+            const lighter = Math.max(backgroundLuminance, preferredLuminance);
+            const darker = Math.min(backgroundLuminance, preferredLuminance);
+            const contrastRatio = (lighter + 0.05) / (darker + 0.05);
+            if (contrastRatio >= 4.5) {
                 return preferredTextColor;
             }
         }
@@ -215,6 +238,13 @@ function getReadableTextColor(backgroundColor, preferredTextColor, theme) {
         return theme === "light" ? fallbackLight : fallbackDark;
     }
     return backgroundLuminance > 0.6 ? fallbackLight : fallbackDark;
+}
+function toRelativeLuminance(r, g, b) {
+    const linearize = (channel) => {
+        const sRGB = channel / 255;
+        return sRGB <= 0.04045 ? sRGB / 12.92 : Math.pow((sRGB + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
 }
 function getColorLuminance(color) {
     if (!color) {
@@ -232,14 +262,14 @@ function getColorLuminance(color) {
         const r = Number.parseInt(normalized.slice(0, 2), 16);
         const g = Number.parseInt(normalized.slice(2, 4), 16);
         const b = Number.parseInt(normalized.slice(4, 6), 16);
-        return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+        return toRelativeLuminance(r, g, b);
     }
     const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
     if (!match) {
         return null;
     }
     const [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])];
-    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return toRelativeLuminance(r, g, b);
 }
 function getThemeClasses(theme) {
     if (theme === "dark") {
