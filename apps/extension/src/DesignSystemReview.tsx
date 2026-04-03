@@ -249,13 +249,19 @@ function TypographySection({
   theme: ThemeMode;
 }) {
   const ui = getThemeClasses(theme);
+  const seenIds = new Set<string>();
   const scale: Array<{ role: string; token: NonNullable<typeof summary.h1> }> = [
     summary.h1 ? { role: "H1", token: summary.h1 } : null,
     summary.h2 ? { role: "H2", token: summary.h2 } : null,
     summary.h3 ? { role: "H3", token: summary.h3 } : null,
     summary.body ? { role: "Body", token: summary.body } : null,
     summary.caption ? { role: "Caption", token: summary.caption } : null,
-  ].filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+  ].filter((entry): entry is NonNullable<typeof entry> => {
+    if (!entry) return false;
+    if (seenIds.has(entry.token.id)) return false;
+    seenIds.add(entry.token.id);
+    return true;
+  });
 
   return (
     <div className="space-y-8">
@@ -285,7 +291,6 @@ function TypographySection({
               <p
                 className={`pr-6 ${ui.headingText}`}
                 style={{
-                  fontFamily: `"${token.fontFamily}", sans-serif`,
                   fontSize: `${Math.min(token.fontSize, 64)}px`,
                   lineHeight: `${Math.min(token.lineHeight, 72)}px`,
                   fontWeight: token.fontWeight,
@@ -555,6 +560,8 @@ function buildSummary(result: ExtractionResult): SummaryModel {
   const caption = [...result.tokens.typography]
     .filter((token) => token.fontSize < 14)
     .sort((left, right) => right.fontSize - left.fontSize)[0];
+  // Headings must be > 20px so they never overlap with body or caption
+  const headings = typography.filter((token) => token.fontSize > 20);
   const primaryColors = result.tokens.colors.filter(
     (token) => (token.role === "fill" || token.role === "text") && !isNeutralColor(token.value)
   );
@@ -584,11 +591,11 @@ function buildSummary(result: ExtractionResult): SummaryModel {
       components: result.components.length
     },
     primaryColor: primaryColors[0] ?? result.tokens.colors[0],
-    mainTypography: typography[0] ?? body,
+    mainTypography: headings[0] ?? body,
     fontFamilies,
-    h1: typography[0],
-    h2: typography[1],
-    h3: typography[2],
+    h1: headings[0],
+    h2: headings[1],
+    h3: headings[2],
     body,
     caption,
     componentFamilies: Object.entries(familyCounts)
