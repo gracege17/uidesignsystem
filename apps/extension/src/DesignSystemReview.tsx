@@ -410,6 +410,7 @@ function ComponentPreview({
   tokens: DesignTokens;
   theme: ThemeMode;
 }) {
+  const ui = getThemeClasses(theme);
   const fill = tokens.colors.find((token) => component.tokens.fills.includes(token.id))?.value;
   const stroke = tokens.colors.find((token) => component.tokens.strokes.includes(token.id))?.value;
   const text = tokens.colors.find((token) => component.tokens.text.includes(token.id))?.value;
@@ -453,14 +454,32 @@ function ComponentPreview({
     const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
     const rawText = component.textContent ?? "";
     const label = rawText.length > 0 && rawText.length <= 30 ? rawText : component.type;
+    const pad = component.autoLayout?.padding;
+    const specs: { label: string; value: string }[] = [];
+    if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+    if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
+    if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+    specs.push({ label: "Size", value: component.variants.size });
     return (
-      <button
-        type="button"
-        className={`w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`}
-        style={{ ...style, borderRadius }}
-      >
-        {label}
-      </button>
+      <div className="space-y-4">
+        <button
+          type="button"
+          className={`w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`}
+          style={{ ...style, borderRadius }}
+        >
+          {label}
+        </button>
+        {specs.length > 0 && (
+          <div className="space-y-1.5">
+            {specs.map((spec) => (
+              <div key={spec.label} className="grid grid-cols-[56px_1fr] gap-3 text-xs">
+                <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
+                <span className={ui.bodyText}>{spec.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
 

@@ -92,6 +92,7 @@ function ComponentsSection({ result, summary, theme }) {
     return (_jsx("div", { className: "space-y-6", children: _jsxs("div", { className: "grid gap-6 md:grid-cols-2", children: [curated.map((component) => (_jsxs("div", { className: `${ui.softPanel} p-5`, children: [_jsxs("div", { className: "flex items-start justify-between gap-3", children: [_jsxs("div", { children: [_jsx("p", { className: `text-sm font-semibold ${ui.headingText}`, children: component.type }), _jsxs("p", { className: `mt-1 text-xs ${ui.bodyText}`, children: [component.variants.style, " \u00B7 ", component.variants.size, " \u00B7 ", component.variants.state] })] }), _jsx("span", { className: `text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: component.name })] }), _jsx("div", { className: `mt-4 p-4 ${ui.previewPanel}`, children: _jsx(ComponentPreview, { component: component, tokens: result.tokens, theme: theme }) })] }, component.id))), curated.length === 0 ? _jsx(EmptyState, { message: "No curated component families were found.", theme: theme }) : null] }) }));
 }
 function ComponentPreview({ component, tokens, theme }) {
+    const ui = getThemeClasses(theme);
     const fill = tokens.colors.find((token) => component.tokens.fills.includes(token.id))?.value;
     const stroke = tokens.colors.find((token) => component.tokens.strokes.includes(token.id))?.value;
     const text = tokens.colors.find((token) => component.tokens.text.includes(token.id))?.value;
@@ -126,7 +127,13 @@ function ComponentPreview({ component, tokens, theme }) {
         const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
         const rawText = component.textContent ?? "";
         const label = rawText.length > 0 && rawText.length <= 30 ? rawText : component.type;
-        return (_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: label }));
+        const pad = component.autoLayout?.padding;
+        const specs = [];
+        if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+        if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
+        if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+        specs.push({ label: "Size", value: component.variants.size });
+        return (_jsxs("div", { className: "space-y-4", children: [_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: label }), specs.length > 0 && _jsx("div", { className: "space-y-1.5", children: specs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[56px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) })] }));
     }
     if (component.type === "Navigation") {
         return (_jsxs("div", { className: "flex items-center gap-4 rounded-full border px-5 py-3 text-sm", style: style, children: [_jsx("span", { children: "Overview" }), _jsx("span", { className: "opacity-60", children: "Pricing" }), _jsx("span", { className: "opacity-60", children: "Docs" })] }));
