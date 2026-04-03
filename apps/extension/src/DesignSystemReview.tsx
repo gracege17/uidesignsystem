@@ -259,23 +259,17 @@ function TypographySection({
 
   return (
     <div className="space-y-8">
-      <div className={`${ui.heroPanel} grid gap-10 ${summary.fontFamilies.length > 1 ? "md:grid-cols-2" : ""}`}>
-        {summary.fontFamilies.length === 0 ? (
-          <div>
-            <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>Typeface</p>
-            <h2 className={`mt-3 text-5xl font-semibold tracking-tight ${ui.heroHeadingText}`}>Typography</h2>
-          </div>
-        ) : summary.fontFamilies.map((family) => (
-          <div key={family}>
-            <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>{family}</p>
-            <div className={`mt-6 space-y-3 ${ui.heroBodyText}`} style={{ fontFamily: `"${family}", sans-serif` }}>
-              <p className="text-2xl tracking-wide">ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
-              <p className="text-2xl tracking-wide">abcdefghijklmnopqrstuvwxyz</p>
-              <p className="text-2xl tracking-wide">0123456789</p>
-              <p className="text-2xl tracking-wide">!@#$%^&*()</p>
-            </div>
-          </div>
-        ))}
+      <div className={`${ui.heroPanel}`}>
+        <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>
+          {summary.fontFamilies.length > 1 ? "Typefaces" : "Typeface"}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-6">
+          {summary.fontFamilies.length === 0 ? (
+            <p className={`text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`}>—</p>
+          ) : summary.fontFamilies.map((family) => (
+            <p key={family} className={`text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`}>{family}</p>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-8">
