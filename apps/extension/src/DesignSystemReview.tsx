@@ -259,25 +259,20 @@ function TypographySection({
 
   return (
     <div className="space-y-8">
-      <div className={`${ui.heroPanel} grid gap-8 ${summary.fontFamilies.length > 1 ? "md:grid-cols-2" : ""}`}>
-        {summary.fontFamilies.map((family) => (
-          <div key={family}>
+      <div className="space-y-0">
+        {summary.fontFamilies.map((family, index) => (
+          <div key={family} className={`${ui.heroPanel} ${index > 0 ? "mt-4" : ""}`}>
             <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>{family}</p>
-            <h2
-              className={`mt-3 text-5xl font-semibold tracking-tight ${ui.heroHeadingText}`}
-              style={{ fontFamily: `"${family}", sans-serif` }}
-            >
-              {family}
-            </h2>
-            <div className={`mt-6 space-y-2 text-sm ${ui.heroBodyText}`} style={{ fontFamily: `"${family}", sans-serif` }}>
-              <p>ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
-              <p>abcdefghijklmnopqrstuvwxyz</p>
-              <p>0123456789</p>
+            <div className={`mt-6 space-y-3 ${ui.heroBodyText}`} style={{ fontFamily: `"${family}", sans-serif` }}>
+              <p className="text-2xl tracking-wide">ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
+              <p className="text-2xl tracking-wide">abcdefghijklmnopqrstuvwxyz</p>
+              <p className="text-2xl tracking-wide">0123456789</p>
+              <p className="text-2xl tracking-wide">!@#$%^&*()</p>
             </div>
           </div>
         ))}
         {summary.fontFamilies.length === 0 && (
-          <div>
+          <div className={`${ui.heroPanel}`}>
             <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>Typeface</p>
             <h2 className={`mt-3 text-5xl font-semibold tracking-tight ${ui.heroHeadingText}`}>Typography</h2>
           </div>
