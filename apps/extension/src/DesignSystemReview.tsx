@@ -176,8 +176,8 @@ function OverviewSection({
           <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.mutedText}`}>Designer Questions</p>
           <div className={`mt-4 space-y-3 text-sm ${ui.bodyText}`}>
             <p>Primary color: <span className={ui.strongText}>{summary.primaryColor?.value ?? "Unknown"}</span></p>
-            <p>H1 candidate: <span className={ui.strongText}>{summary.h1?.name ?? "Unknown"}</span></p>
-            <p>Body style: <span className={ui.strongText}>{summary.body?.name ?? "Unknown"}</span></p>
+            <p>H1 candidate: <span className={ui.strongText}>{summary.h1 ? `${summary.h1.fontFamily} ${summary.h1.fontSize}px / ${summary.h1.fontWeight}` : "Unknown"}</span></p>
+            <p>Body style: <span className={ui.strongText}>{summary.body ? `${summary.body.fontFamily} ${summary.body.fontSize}px / ${summary.body.fontWeight}` : "Unknown"}</span></p>
             <p>Main component families: <span className={ui.strongText}>{summary.componentFamilies.slice(0, 3).map((family) => family.type).join(", ") || "Unknown"}</span></p>
           </div>
         </div>
