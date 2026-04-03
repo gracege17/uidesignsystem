@@ -144,7 +144,7 @@ function buildSummary(result) {
     const headings = typography.filter((token) => token.fontSize > 20);
     const primaryColors = result.tokens.colors.filter((token) => (token.role === "fill" || token.role === "text") && !isNeutralColor(token.value));
     const neutralColors = result.tokens.colors.filter((token) => isNeutralColor(token.value));
-    const accentColors = result.tokens.colors.filter((token) => !primaryColors.includes(token) && !neutralColors.includes(token) && token.role !== "stroke");
+    const accentColors = result.tokens.colors.filter((token) => !primaryColors.includes(token) && !neutralColors.includes(token));
     const familyCounts = result.components.reduce((accumulator, component) => {
         accumulator[component.type] = (accumulator[component.type] ?? 0) + 1;
         return accumulator;
