@@ -97,18 +97,13 @@ function ComponentPreview({ component, tokens, theme }) {
     const text = tokens.colors.find((token) => component.tokens.text.includes(token.id))?.value;
     const type = tokens.typography.find((token) => component.tokens.typography.includes(token.id));
     const variantStyle = component.variants.style;
-    const resolvedBackground =
-        variantStyle === "outline" || variantStyle === "ghost"
-            ? "transparent"
-            : (fill ?? (theme === "light" ? "#ffffff" : "#0f172a"));
+    const resolvedBackground = variantStyle === "outline" || variantStyle === "ghost"
+        ? "transparent"
+        : (fill ?? (theme === "light" ? "#ffffff" : "#0f172a"));
     const resolvedBorder = stroke ?? fill ?? (theme === "light" ? "#d4d4d8" : "#334155");
-    const previewTextColor = getReadableTextColor(
-        variantStyle === "outline" || variantStyle === "ghost"
-            ? (theme === "light" ? "#ffffff" : "#0f172a")
-            : resolvedBackground,
-        text ?? (variantStyle !== "fill" ? (fill ?? stroke) : undefined),
-        theme
-    );
+    const previewTextColor = getReadableTextColor(variantStyle === "outline" || variantStyle === "ghost"
+        ? (theme === "light" ? "#ffffff" : "#0f172a")
+        : resolvedBackground, text ?? (variantStyle !== "fill" ? (fill ?? stroke) : undefined), theme);
     const padding = component.autoLayout?.padding;
     const paddingStyle = padding
         ? {
@@ -128,7 +123,7 @@ function ComponentPreview({ component, tokens, theme }) {
         ...paddingStyle
     };
     if (component.type === "Button" || component.type === "Badge") {
-        return (_jsx("button", { type: "button", className: `rounded-full ${variantStyle === "ghost" ? "border-transparent" : "border"}`, style: style, children: component.type }));
+        return (_jsx("button", { type: "button", className: `w-fit rounded-full ${variantStyle === "ghost" ? "border-0" : "border"}`, style: style, children: component.type }));
     }
     if (component.type === "Navigation") {
         return (_jsxs("div", { className: "flex items-center gap-4 rounded-full border px-5 py-3 text-sm", style: style, children: [_jsx("span", { children: "Overview" }), _jsx("span", { className: "opacity-60", children: "Pricing" }), _jsx("span", { className: "opacity-60", children: "Docs" })] }));
@@ -259,13 +254,6 @@ function getReadableTextColor(backgroundColor, preferredTextColor, theme) {
     }
     return backgroundLuminance > 0.6 ? fallbackLight : fallbackDark;
 }
-function toRelativeLuminance(r, g, b) {
-    const linearize = (channel) => {
-        const sRGB = channel / 255;
-        return sRGB <= 0.04045 ? sRGB / 12.92 : Math.pow((sRGB + 0.055) / 1.055, 2.4);
-    };
-    return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
-}
 function getColorLuminance(color) {
     if (!color) {
         return null;
@@ -290,6 +278,13 @@ function getColorLuminance(color) {
     }
     const [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])];
     return toRelativeLuminance(r, g, b);
+}
+function toRelativeLuminance(r, g, b) {
+    const linearize = (channel) => {
+        const sRGB = channel / 255;
+        return sRGB <= 0.04045 ? sRGB / 12.92 : Math.pow((sRGB + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
 }
 function getThemeClasses(theme) {
     if (theme === "dark") {

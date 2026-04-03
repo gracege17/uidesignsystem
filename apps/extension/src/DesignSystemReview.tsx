@@ -453,7 +453,7 @@ function ComponentPreview({
     return (
       <button
         type="button"
-        className={`rounded-full ${variantStyle === "ghost" ? "border-transparent" : "border"}`}
+        className={`w-fit rounded-full ${variantStyle === "ghost" ? "border-0" : "border"}`}
         style={style}
       >
         {component.type}
