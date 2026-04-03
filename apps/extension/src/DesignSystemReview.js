@@ -98,10 +98,11 @@ function ComponentPreview({ component, tokens, theme }) {
     const text = tokens.colors.find((token) => component.tokens.text.includes(token.id))?.value;
     const type = tokens.typography.find((token) => component.tokens.typography.includes(token.id));
     const variantStyle = component.variants.style;
+    const primaryBrandColor = tokens.colors.find((t) => t.role === "fill" && !isNeutralColor(t.value))?.value;
     const resolvedBackground = variantStyle === "outline" || variantStyle === "ghost"
         ? "transparent"
-        : (fill ?? (theme === "light" ? "#ffffff" : "#0f172a"));
-    const resolvedBorder = stroke ?? fill ?? (theme === "light" ? "#d4d4d8" : "#334155");
+        : (fill ?? primaryBrandColor ?? (theme === "light" ? "#6366f1" : "#4f46e5"));
+    const resolvedBorder = stroke ?? fill ?? primaryBrandColor ?? (theme === "light" ? "#d4d4d8" : "#334155");
     const previewTextColor = getReadableTextColor(variantStyle === "outline" || variantStyle === "ghost"
         ? (theme === "light" ? "#ffffff" : "#0f172a")
         : resolvedBackground, text ?? (variantStyle !== "fill" ? (fill ?? stroke) : undefined), theme);
@@ -116,7 +117,8 @@ function ComponentPreview({ component, tokens, theme }) {
         : { padding: "10px 20px" };
     const style = {
         backgroundColor: resolvedBackground,
-        borderColor: variantStyle === "ghost" ? "transparent" : resolvedBorder,
+        border: variantStyle === "fill" ? "none" : undefined,
+        borderColor: variantStyle === "fill" ? undefined : (variantStyle === "ghost" ? "transparent" : resolvedBorder),
         color: previewTextColor,
         fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
         fontSize: type ? `${Math.min(type.fontSize, 18)}px` : undefined,
