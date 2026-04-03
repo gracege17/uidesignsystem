@@ -74,49 +74,20 @@ export default function DesignSystemReview({
 
   return (
     <div className="space-y-12">
-      <SectionShell title="Overview" subtitle="Key extracted foundations and primary signals." theme={theme}>
-        <OverviewSection
-          summary={summary}
-          theme={theme}
-          copied={copiedKey === "everything"}
-          onCopy={() => void copySection("everything")}
-        />
+      <SectionShell title="Overview" subtitle="Key extracted foundations and primary signals." theme={theme} copyLabel="Copy Everything" copied={copiedKey === "everything"} onCopy={() => void copySection("everything")}>
+        <OverviewSection summary={summary} theme={theme} />
       </SectionShell>
-      <SectionShell title="Color Styles" subtitle="Starter color styles extracted from the page." theme={theme}>
-        <ColorSection
-          tokens={result.tokens}
-          summary={summary}
-          theme={theme}
-          copied={copiedKey === "color"}
-          onCopy={() => void copySection("color")}
-        />
+      <SectionShell title="Color Styles" subtitle="Starter color styles extracted from the page." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void copySection("color")}>
+        <ColorSection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
-      <SectionShell title="Typography" subtitle="Likely display, heading, and body styles." theme={theme}>
-        <TypographySection
-          tokens={result.tokens}
-          summary={summary}
-          theme={theme}
-          copied={copiedKey === "typography"}
-          onCopy={() => void copySection("typography")}
-        />
+      <SectionShell title="Typography" subtitle="Likely display, heading, and body styles." theme={theme} copyLabel="Copy Typography" copied={copiedKey === "typography"} onCopy={() => void copySection("typography")}>
+        <TypographySection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
-      <SectionShell title="Grid & Layout" subtitle="Common layout patterns and spacing primitives." theme={theme}>
-        <LayoutSection
-          components={result.components}
-          summary={summary}
-          theme={theme}
-          copied={copiedKey === "layout"}
-          onCopy={() => void copySection("layout")}
-        />
+      <SectionShell title="Grid & Layout" subtitle="Common layout patterns and spacing primitives." theme={theme} copyLabel="Copy Layout" copied={copiedKey === "layout"} onCopy={() => void copySection("layout")}>
+        <LayoutSection components={result.components} summary={summary} theme={theme} />
       </SectionShell>
-      <SectionShell title="Components" subtitle="Top reusable component families extracted from the page." theme={theme}>
-        <ComponentsSection
-          result={result}
-          summary={summary}
-          theme={theme}
-          copied={copiedKey === "components"}
-          onCopy={() => void copySection("components")}
-        />
+      <SectionShell title="Components" subtitle="Top reusable component families extracted from the page." theme={theme} copyLabel="Copy Components" copied={copiedKey === "components"} onCopy={() => void copySection("components")}>
+        <ComponentsSection result={result} summary={summary} theme={theme} />
       </SectionShell>
     </div>
   );
@@ -139,92 +110,63 @@ function SplitSection({
 }) {
   if (tab === "overview") {
     return (
-      <SectionShell title="Overview" subtitle="Start here to identify the main design-system signals." theme={theme}>
-        <OverviewSection
-          summary={summary}
-          theme={theme}
-          copied={copiedKey === "everything"}
-          onCopy={() => void onCopy("everything")}
-        />
+      <SectionShell title="Overview" subtitle="Start here to identify the main design-system signals." theme={theme} copyLabel="Copy Everything" copied={copiedKey === "everything"} onCopy={() => void onCopy("everything")}>
+        <OverviewSection summary={summary} theme={theme} />
       </SectionShell>
     );
   }
 
   if (tab === "color") {
     return (
-      <SectionShell title="Color Styles" subtitle="Grouped color styles with primary and supporting tokens." theme={theme}>
-        <ColorSection
-          tokens={result.tokens}
-          summary={summary}
-          theme={theme}
-          copied={copiedKey === "color"}
-          onCopy={() => void onCopy("color")}
-        />
+      <SectionShell title="Color Styles" subtitle="Grouped color styles with primary and supporting tokens." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void onCopy("color")}>
+        <ColorSection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
     );
   }
 
   if (tab === "typography") {
     return (
-      <SectionShell title="Typography" subtitle="Likely display, heading, and body specimens." theme={theme}>
-        <TypographySection
-          tokens={result.tokens}
-          summary={summary}
-          theme={theme}
-          copied={copiedKey === "typography"}
-          onCopy={() => void onCopy("typography")}
-        />
+      <SectionShell title="Typography" subtitle="Likely display, heading, and body specimens." theme={theme} copyLabel="Copy Typography" copied={copiedKey === "typography"} onCopy={() => void onCopy("typography")}>
+        <TypographySection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
     );
   }
 
   if (tab === "layout") {
     return (
-      <SectionShell title="Grid & Layout" subtitle="Visual layout primitives instead of raw auto-layout metadata." theme={theme}>
-        <LayoutSection
-          components={result.components}
-          summary={summary}
-          theme={theme}
-          copied={copiedKey === "layout"}
-          onCopy={() => void onCopy("layout")}
-        />
+      <SectionShell title="Grid & Layout" subtitle="Visual layout primitives instead of raw auto-layout metadata." theme={theme} copyLabel="Copy Layout" copied={copiedKey === "layout"} onCopy={() => void onCopy("layout")}>
+        <LayoutSection components={result.components} summary={summary} theme={theme} />
       </SectionShell>
     );
   }
 
   return (
-    <SectionShell title="Components" subtitle="Curated gallery of the most repeated component families." theme={theme}>
-      <ComponentsSection
-        result={result}
-        summary={summary}
-        theme={theme}
-        copied={copiedKey === "components"}
-        onCopy={() => void onCopy("components")}
-      />
+    <SectionShell title="Components" subtitle="Curated gallery of the most repeated component families." theme={theme} copyLabel="Copy Components" copied={copiedKey === "components"} onCopy={() => void onCopy("components")}>
+      <ComponentsSection result={result} summary={summary} theme={theme} />
     </SectionShell>
   );
 }
 
 function OverviewSection({
   summary,
-  theme,
-  copied,
-  onCopy
+  theme
 }: {
   summary: SummaryModel;
   theme: ThemeMode;
-  copied: boolean;
-  onCopy: () => void;
 }) {
   const ui = getThemeClasses(theme);
 
   return (
     <div className="space-y-8">
-      <HeaderActions label="Copy Everything" copied={copied} onCopy={onCopy} theme={theme} />
       <div className={`border-t pt-8 ${ui.rule}`}>
         <div className="grid gap-4 md:grid-cols-3">
           <OverviewCard label="Primary Color" value={summary.primaryColor?.name ?? "Not found"} detail={summary.primaryColor?.value ?? "No dominant color yet"} theme={theme} />
-          <OverviewCard label="Main Typeface" value={summary.mainTypography?.fontFamily ?? "Not found"} detail={summary.mainTypography ? `${summary.mainTypography.fontSize}px / ${summary.mainTypography.lineHeight}px` : "No dominant text style yet"} theme={theme} />
+          <OverviewCard
+            label={summary.fontFamilies.length > 1 ? "Typefaces" : "Typeface"}
+            value={summary.fontFamilies.length > 0 ? summary.fontFamilies.join(" / ") : "Not found"}
+            detail={summary.fontFamilies.length > 1 ? "Paired typeface system" : (summary.mainTypography ? `${summary.mainTypography.fontSize}px / ${summary.mainTypography.lineHeight}px` : "No dominant text style yet")}
+            theme={theme}
+          />
           <OverviewCard label="Top Family" value={summary.componentFamilies[0]?.type ?? "Not found"} detail={summary.componentFamilies[0] ? `${summary.componentFamilies[0].count} instances` : "No repeated family yet"} theme={theme} />
         </div>
       </div>
@@ -257,15 +199,11 @@ function OverviewSection({
 function ColorSection({
   tokens,
   summary,
-  theme,
-  copied,
-  onCopy
+  theme
 }: {
   tokens: DesignTokens;
   summary: SummaryModel;
   theme: ThemeMode;
-  copied: boolean;
-  onCopy: () => void;
 }) {
   const ui = getThemeClasses(theme);
   const groups = [
@@ -276,7 +214,6 @@ function ColorSection({
 
   return (
     <div className="space-y-10">
-      <HeaderActions label="Copy Color" copied={copied} onCopy={onCopy} theme={theme} />
       {groups.map((group) => (
         <section key={group.label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-8">
           <div className={`pt-3 text-sm font-medium ${ui.subtleText}`}>{group.label}</div>
@@ -305,42 +242,53 @@ function ColorSection({
 function TypographySection({
   tokens,
   summary,
-  theme,
-  copied,
-  onCopy
+  theme
 }: {
   tokens: DesignTokens;
   summary: SummaryModel;
   theme: ThemeMode;
-  copied: boolean;
-  onCopy: () => void;
 }) {
   const ui = getThemeClasses(theme);
-  const scale = [summary.h1, summary.h2, summary.h3, summary.body, summary.caption].filter(
-    (token): token is NonNullable<typeof token> => Boolean(token)
-  );
+  const scale: Array<{ role: string; token: NonNullable<typeof summary.h1> }> = [
+    summary.h1 ? { role: "H1", token: summary.h1 } : null,
+    summary.h2 ? { role: "H2", token: summary.h2 } : null,
+    summary.h3 ? { role: "H3", token: summary.h3 } : null,
+    summary.body ? { role: "Body", token: summary.body } : null,
+    summary.caption ? { role: "Caption", token: summary.caption } : null,
+  ].filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
 
   return (
     <div className="space-y-8">
-      <HeaderActions label="Copy Typography" copied={copied} onCopy={onCopy} theme={theme} />
-      <div className={`p-8 ${ui.heroPanel}`}>
-        <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>{summary.mainTypography?.fontFamily ?? "Typeface"}</p>
-        <h2 className={`mt-3 text-5xl font-semibold tracking-tight ${ui.heroHeadingText}`}>
-          {summary.mainTypography?.fontFamily ?? "Typography"}
-        </h2>
-        <div className={`mt-6 space-y-2 text-sm ${ui.heroBodyText}`}>
-          <p>ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
-          <p>abcdefghijklmnopqrstuvwxyz</p>
-          <p>0123456789</p>
-          <p>!@#$%^&*()</p>
-        </div>
+      <div className={`${ui.heroPanel} grid gap-8 ${summary.fontFamilies.length > 1 ? "md:grid-cols-2" : ""}`}>
+        {summary.fontFamilies.map((family) => (
+          <div key={family}>
+            <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>{family}</p>
+            <h2
+              className={`mt-3 text-5xl font-semibold tracking-tight ${ui.heroHeadingText}`}
+              style={{ fontFamily: `"${family}", sans-serif` }}
+            >
+              {family}
+            </h2>
+            <div className={`mt-6 space-y-2 text-sm ${ui.heroBodyText}`} style={{ fontFamily: `"${family}", sans-serif` }}>
+              <p>ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
+              <p>abcdefghijklmnopqrstuvwxyz</p>
+              <p>0123456789</p>
+            </div>
+          </div>
+        ))}
+        {summary.fontFamilies.length === 0 && (
+          <div>
+            <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>Typeface</p>
+            <h2 className={`mt-3 text-5xl font-semibold tracking-tight ${ui.heroHeadingText}`}>Typography</h2>
+          </div>
+        )}
       </div>
 
       <div className="space-y-8">
-        {scale.map((token) => (
+        {scale.map(({ role, token }) => (
           <div key={token.id} className={`border-t pt-6 ${ui.rule}`}>
             <div className={`mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>
-              <span>{token.name}</span>
+              <span>{role} — {token.fontFamily}</span>
               <span>Font Size</span>
               <span>Line Height</span>
             </div>
@@ -373,22 +321,17 @@ function TypographySection({
 function LayoutSection({
   components,
   summary,
-  theme,
-  copied,
-  onCopy
+  theme
 }: {
   components: ExtractedComponent[];
   summary: SummaryModel;
   theme: ThemeMode;
-  copied: boolean;
-  onCopy: () => void;
 }) {
   const ui = getThemeClasses(theme);
   const layouts = summary.layoutPatterns.slice(0, 6);
 
   return (
     <div className="space-y-8">
-      <HeaderActions label="Copy Layout" copied={copied} onCopy={onCopy} theme={theme} />
       <div className={`p-8 ${ui.heroPanel}`}>
         <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>Desktop</p>
         <h2 className={`mt-3 text-5xl font-semibold tracking-tight ${ui.heroHeadingText}`}>Grid & Layout</h2>
@@ -425,15 +368,11 @@ function LayoutSection({
 function ComponentsSection({
   result,
   summary,
-  theme,
-  copied,
-  onCopy
+  theme
 }: {
   result: ExtractionResult;
   summary: SummaryModel;
   theme: ThemeMode;
-  copied: boolean;
-  onCopy: () => void;
 }) {
   const ui = getThemeClasses(theme);
   const curated = summary.componentFamilies
@@ -443,7 +382,6 @@ function ComponentsSection({
 
   return (
     <div className="space-y-6">
-      <HeaderActions label="Copy Components" copied={copied} onCopy={onCopy} theme={theme} />
       <div className="grid gap-6 md:grid-cols-2">
       {curated.map((component) => (
         <div key={component.id} className={`${ui.softPanel} p-5`}>
@@ -525,19 +463,32 @@ function SectionShell({
   title,
   subtitle,
   children,
-  theme
+  theme,
+  copyLabel,
+  copied,
+  onCopy
 }: {
   title: string;
   subtitle: string;
   children: React.ReactNode;
   theme: ThemeMode;
+  copyLabel: string;
+  copied: boolean;
+  onCopy: () => void;
 }) {
   const ui = getThemeClasses(theme);
   return (
     <div className="space-y-6">
       <div className={`border-t pt-6 ${ui.rule}`}>
-        <h1 className={`text-5xl font-semibold tracking-tight ${ui.headingText}`}>{title}</h1>
-        <p className={`mt-3 text-sm leading-6 ${ui.mutedText}`}>{subtitle}</p>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className={`text-5xl font-semibold tracking-tight ${ui.headingText}`}>{title}</h1>
+            <p className={`mt-3 text-sm leading-6 ${ui.mutedText}`}>{subtitle}</p>
+          </div>
+          <button type="button" onClick={onCopy} className={`shrink-0 rounded-full border px-4 py-2 text-sm transition ${ui.copyButton}`}>
+            {copied ? "Copied" : copyLabel}
+          </button>
+        </div>
       </div>
       {children}
     </div>
@@ -580,26 +531,6 @@ function EmptyState({ message, theme }: { message: string; theme: ThemeMode }) {
   return <div className={`${ui.softPanel} p-5 text-sm ${ui.mutedText}`}>{message}</div>;
 }
 
-function HeaderActions({
-  label,
-  copied,
-  onCopy,
-  theme
-}: {
-  label: string;
-  copied: boolean;
-  onCopy: () => void;
-  theme: ThemeMode;
-}) {
-  const ui = getThemeClasses(theme);
-  return (
-    <div className="flex justify-end">
-      <button type="button" onClick={onCopy} className={`rounded-full border px-4 py-2 text-sm transition ${ui.copyButton}`}>
-        {copied ? "Copied" : label}
-      </button>
-    </div>
-  );
-}
 
 interface SummaryModel {
   counts: {
@@ -610,6 +541,7 @@ interface SummaryModel {
   };
   primaryColor?: DesignTokens["colors"][number];
   mainTypography?: DesignTokens["typography"][number];
+  fontFamilies: string[];
   h1?: DesignTokens["typography"][number];
   h2?: DesignTokens["typography"][number];
   h3?: DesignTokens["typography"][number];
@@ -627,6 +559,7 @@ interface SummaryModel {
 
 function buildSummary(result: ExtractionResult): SummaryModel {
   const typography = [...result.tokens.typography].sort((left, right) => right.fontSize - left.fontSize);
+  const fontFamilies = [...new Set(typography.map((t) => t.fontFamily))];
   const body = [...result.tokens.typography]
     .filter((token) => token.fontSize >= 14 && token.fontSize <= 20)
     .sort((left, right) => Math.abs(left.fontSize - 16) - Math.abs(right.fontSize - 16))[0];
@@ -662,7 +595,8 @@ function buildSummary(result: ExtractionResult): SummaryModel {
       components: result.components.length
     },
     primaryColor: primaryColors[0] ?? result.tokens.colors[0],
-    mainTypography: body ?? typography[0],
+    mainTypography: typography[0] ?? body,
+    fontFamilies,
     h1: typography[0],
     h2: typography[1],
     h3: typography[2],
@@ -833,7 +767,7 @@ function buildOverviewCopy(summary: SummaryModel) {
   return [
     "Overview",
     `- Primary color: ${summary.primaryColor?.value ?? "Unknown"}`,
-    `- Main typeface: ${summary.mainTypography?.fontFamily ?? "Unknown"}`,
+    `- Typefaces: ${summary.fontFamilies.length > 0 ? summary.fontFamilies.join(", ") : "Unknown"}`,
     `- H1 candidate: ${summary.h1 ? `${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / ${summary.h1.fontWeight}` : "Unknown"}`,
     `- Body style: ${summary.body ? `${summary.body.fontSize}px / ${summary.body.lineHeight}px / ${summary.body.fontWeight}` : "Unknown"}`,
     `- Main component families: ${summary.componentFamilies.slice(0, 3).map((family) => family.type).join(", ") || "Unknown"}`
@@ -851,7 +785,7 @@ function buildColorCopy(summary: SummaryModel) {
 
 function buildTypographyCopy(summary: SummaryModel) {
   const lines = ["Typography"];
-  if (summary.mainTypography) lines.push(`- Main typeface: ${summary.mainTypography.fontFamily}`);
+  if (summary.fontFamilies.length > 0) lines.push(`- Typefaces: ${summary.fontFamilies.join(", ")}`);
   if (summary.h1) lines.push(`- H1: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight}`);
   if (summary.h2) lines.push(`- H2: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight}`);
   if (summary.h3) lines.push(`- H3: ${summary.h3.fontSize}px / ${summary.h3.lineHeight}px / weight ${summary.h3.fontWeight}`);
