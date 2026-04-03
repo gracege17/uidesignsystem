@@ -1,5 +1,27 @@
-node_modules
-dist
-.turbo
-.DS_Store
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+
+# Turbo and tool caches
+.turbo/
+**/.turbo/
+.vite/
+**/.vite/
+
+# TypeScript build artifacts
+*.tsbuildinfo
+
+# Logs
 *.log
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# OS/editor noise
+.DS_Store
