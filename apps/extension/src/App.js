@@ -55,7 +55,10 @@ function captureSerializedStylesFromDocument() {
         if (element.id) {
             return `${tagName}#${element.id}`;
         }
-        const className = Array.from(element.classList).slice(0, 2).join(".");
+        const classes = Array.from(element.classList);
+        const semantic = classes.find((c) => c.length > 6 && /[_A-Z]/.test(c));
+        const picked = semantic ? [semantic, ...classes.filter((c) => c !== semantic).slice(0, 1)] : classes.slice(0, 2);
+        const className = picked.join(".");
         return className ? `${tagName}.${className}` : tagName;
     };
     const normalizeTextTransform = (value) => {
@@ -130,7 +133,16 @@ function captureSerializedStylesFromDocument() {
             (!hasVisibleArea && !hasText)) {
             return null;
         }
-        const backgroundColor = style.backgroundColor;
+        let backgroundColor = style.backgroundColor;
+        if ((backgroundColor === "rgba(0, 0, 0, 0)" || backgroundColor === "transparent") && element.children.length > 0) {
+            for (const child of Array.from(element.children).slice(0, 3)) {
+                const childBg = window.getComputedStyle(child).backgroundColor;
+                if (childBg !== "rgba(0, 0, 0, 0)" && childBg !== "transparent") {
+                    backgroundColor = childBg;
+                    break;
+                }
+            }
+        }
         const borderColor = style.borderStyle !== "none" &&
             (parseFloat(style.borderTopWidth) > 0 || parseFloat(style.borderRightWidth) > 0)
             ? style.borderColor
@@ -151,10 +163,10 @@ function captureSerializedStylesFromDocument() {
             height: parsePx(String(rect.height)),
             display: style.display,
             gap: parsePx(style.gap),
-            paddingTop: parsePx(style.paddingTop),
-            paddingRight: parsePx(style.paddingRight),
-            paddingBottom: parsePx(style.paddingBottom),
-            paddingLeft: parsePx(style.paddingLeft),
+            paddingTop: parsePx(style.paddingTop) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0]).paddingTop) : undefined),
+            paddingRight: parsePx(style.paddingRight) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0]).paddingRight) : undefined),
+            paddingBottom: parsePx(style.paddingBottom) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0]).paddingBottom) : undefined),
+            paddingLeft: parsePx(style.paddingLeft) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0]).paddingLeft) : undefined),
             justifyContent: style.justifyContent,
             alignItems: style.alignItems,
             flexWrap: style.flexWrap,

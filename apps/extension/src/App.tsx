@@ -151,7 +151,12 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
       return `${tagName}#${element.id}`;
     }
 
-    const className = Array.from(element.classList).slice(0, 2).join(".");
+    const classes = Array.from(element.classList);
+    // Prefer semantic class names (CSS modules, BEM) over obfuscated short ones.
+    // Semantic classes tend to be longer and contain underscores or capital letters.
+    const semantic = classes.find((c) => c.length > 6 && /[_A-Z]/.test(c));
+    const picked = semantic ? [semantic, ...classes.filter((c) => c !== semantic).slice(0, 1)] : classes.slice(0, 2);
+    const className = picked.join(".");
     return className ? `${tagName}.${className}` : tagName;
   };
 
@@ -253,7 +258,18 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         return null;
       }
 
-      const backgroundColor = style.backgroundColor;
+      // If the element itself is transparent, check direct children for the real fill.
+      // Buttons on sites like Gusto apply background via a child wrapper or pseudo-element.
+      let backgroundColor = style.backgroundColor;
+      if ((backgroundColor === "rgba(0, 0, 0, 0)" || backgroundColor === "transparent") && element.children.length > 0) {
+        for (const child of Array.from(element.children).slice(0, 3)) {
+          const childBg = window.getComputedStyle(child as HTMLElement).backgroundColor;
+          if (childBg !== "rgba(0, 0, 0, 0)" && childBg !== "transparent") {
+            backgroundColor = childBg;
+            break;
+          }
+        }
+      }
       const borderColor =
         style.borderStyle !== "none" &&
         (parseFloat(style.borderTopWidth) > 0 || parseFloat(style.borderRightWidth) > 0)
@@ -277,10 +293,11 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         height: parsePx(String(rect.height)),
         display: style.display,
         gap: parsePx(style.gap),
-        paddingTop: parsePx(style.paddingTop),
-        paddingRight: parsePx(style.paddingRight),
-        paddingBottom: parsePx(style.paddingBottom),
-        paddingLeft: parsePx(style.paddingLeft),
+        // If element has no padding, check its first child (button label spans often carry the padding).
+        paddingTop: parsePx(style.paddingTop) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0] as HTMLElement).paddingTop) : undefined),
+        paddingRight: parsePx(style.paddingRight) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0] as HTMLElement).paddingRight) : undefined),
+        paddingBottom: parsePx(style.paddingBottom) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0] as HTMLElement).paddingBottom) : undefined),
+        paddingLeft: parsePx(style.paddingLeft) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0] as HTMLElement).paddingLeft) : undefined),
         justifyContent: style.justifyContent,
         alignItems: style.alignItems,
         flexWrap: style.flexWrap,
