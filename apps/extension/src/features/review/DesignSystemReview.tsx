@@ -744,6 +744,18 @@ function scorePrimaryButton(component: ExtractedComponent): number {
     score += 20;
   }
 
+  // Buttons higher on the page are more likely to be the primary CTA.
+  // pageY 0-200 covers nav + hero; 200-700 covers above-the-fold content.
+  if (component.pageY !== undefined) {
+    if (component.pageY <= 200) {
+      score += 80;
+    } else if (component.pageY <= 700) {
+      score += 50;
+    } else if (component.pageY <= 1400) {
+      score += 20;
+    }
+  }
+
   if (component.width) {
     score += Math.min(component.width, 320) * 0.2;
   }
@@ -774,8 +786,16 @@ function getComponentDisplayMeta(component: ExtractedComponent): {
   if (component.type === "Navigation") {
     return {
       title: "Top Nav",
-      subtitle: "Top nav item",
+      subtitle: "Container · padding · gap",
       badge: "top nav"
+    };
+  }
+
+  if (component.type === "NavigationItem") {
+    return {
+      title: "Top Nav Item",
+      subtitle: "Clickable link · inside top nav",
+      badge: "top nav item"
     };
   }
 
@@ -963,6 +983,55 @@ function ComponentPreview({
           <span style={{ opacity: 0.6 }}>Pricing</span>
           <span style={{ opacity: 0.6 }}>Docs</span>
         </div>
+        {showSpecs && specs.length > 0 && (
+          <div className="space-y-1.5">
+            {specs.map((spec) => (
+              <div key={spec.label} className="grid grid-cols-[64px_1fr] gap-3 text-xs">
+                <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
+                <span className={ui.bodyText}>{spec.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (component.type === "NavigationItem") {
+    const itemBg = fill ?? "transparent";
+    const itemText = getReadableTextColor(
+      itemBg === "transparent" ? (theme === "light" ? "#ffffff" : "#0f172a") : itemBg,
+      text,
+      theme
+    );
+    const pad = component.padding ?? component.autoLayout?.padding;
+    const label = component.textContent?.trim() || "Overview";
+    const specs: { label: string; value: string }[] = [];
+    if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+    if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
+    if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+
+    return (
+      <div className="space-y-4">
+        <a
+          href="#"
+          className="inline-block text-sm"
+          onClick={(e) => e.preventDefault()}
+          style={{
+            backgroundColor: itemBg === "transparent" ? undefined : itemBg,
+            color: itemText,
+            fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
+            fontSize: type ? `${Math.min(type.fontSize, 16)}px` : undefined,
+            fontWeight: type?.fontWeight,
+            borderRadius: component.cornerRadius !== undefined ? `${component.cornerRadius}px` : undefined,
+            ...(pad
+              ? { paddingTop: `${pad.top}px`, paddingRight: `${pad.right}px`, paddingBottom: `${pad.bottom}px`, paddingLeft: `${pad.left}px` }
+              : { padding: "8px 12px" }),
+            textDecoration: "none"
+          }}
+        >
+          {label}
+        </a>
         {showSpecs && specs.length > 0 && (
           <div className="space-y-1.5">
             {specs.map((spec) => (

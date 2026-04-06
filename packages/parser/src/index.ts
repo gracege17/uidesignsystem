@@ -51,6 +51,8 @@ export interface SerializedStyleNode {
   lineHeight?: number | string;
   letterSpacing?: number | string;
   textTransform?: TypographyToken["textTransform"];
+  landmark?: "nav" | "header" | "main" | "footer" | "aside";
+  pageY?: number;
 }
 
 interface ColorCandidate {
@@ -291,7 +293,9 @@ export function extractComponents(
       padding: inferPadding(candidate.node),
       width: normalizeLength(candidate.node.width) ?? undefined,
       height: normalizeLength(candidate.node.height) ?? undefined,
-      textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })()
+      textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })(),
+      landmark: candidate.node.landmark,
+      pageY: candidate.node.pageY
     };
   });
 }
@@ -305,7 +309,11 @@ function inferComponentName(
   const semanticStem = inferSemanticStem([candidate.node.source], "component");
 
   if (candidate.type === "Navigation") {
-    return makeUniqueName(`${typeStem}/top-nav`, usedNames, index);
+    return makeUniqueName(`navigation/top-nav`, usedNames, index);
+  }
+
+  if (candidate.type === "NavigationItem") {
+    return makeUniqueName(`navigation/top-nav-item`, usedNames, index);
   }
 
   return makeUniqueName(
@@ -368,6 +376,8 @@ function shouldKeepComponentCandidate(candidate: ComponentCandidate): boolean {
       return hasInputConfidence(candidate.node);
     case "Navigation":
       return hasNavigationConfidence(candidate.node);
+    case "NavigationItem":
+      return hasNavigationItemConfidence(candidate.node);
     case "Modal":
       return hasModalConfidence(candidate.node);
     case "Accordion":
@@ -445,6 +455,16 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     return "Input";
   }
 
+  // Links and buttons inside a <nav> landmark are nav items, not the nav container.
+  if (
+    node.landmark === "nav" &&
+    (node.tagName === "a" || node.tagName === "button" || node.role === "menuitem" || node.role === "tab") &&
+    Boolean((node.textContent ?? "").trim()) &&
+    (node.height ?? 999) <= 80
+  ) {
+    return "NavigationItem";
+  }
+
   if (node.tagName === "nav" || /\b(nav|navigation|menu|tabs?)\b/.test(haystack)) {
     return "Navigation";
   }
@@ -503,6 +523,16 @@ function hasNavigationConfidence(node: SerializedStyleNode): boolean {
   const tagName = (node.tagName ?? "").toLowerCase();
   const source = buildComponentHaystack(node);
   return tagName === "nav" || /\b(nav|navigation|menu|tabs?)\b/.test(source);
+}
+
+function hasNavigationItemConfidence(node: SerializedStyleNode): boolean {
+  const tagName = (node.tagName ?? "").toLowerCase();
+  return (
+    node.landmark === "nav" &&
+    (tagName === "a" || tagName === "button" || node.role === "menuitem" || node.role === "tab") &&
+    Boolean((node.textContent ?? "").trim()) &&
+    (node.height ?? 999) <= 80
+  );
 }
 
 function hasModalConfidence(node: SerializedStyleNode): boolean {

@@ -266,6 +266,20 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
     );
   };
 
+  const LANDMARK_TAGS = new Set(["nav", "header", "main", "footer", "aside"]);
+
+  const getNearestLandmark = (element: HTMLElement): SerializedStyleNode["landmark"] => {
+    let node: HTMLElement | null = element.parentElement;
+    while (node && node.tagName.toLowerCase() !== "body") {
+      const tag = node.tagName.toLowerCase();
+      if (LANDMARK_TAGS.has(tag)) {
+        return tag as SerializedStyleNode["landmark"];
+      }
+      node = node.parentElement;
+    }
+    return undefined;
+  };
+
   const maxNodes = 300;
   const elements = Array.from(document.querySelectorAll<HTMLElement>("*"));
 
@@ -290,7 +304,14 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         if (style.backgroundImage !== "none" && style.backgroundImage.includes("gradient")) {
           const match = style.backgroundImage.match(/rgba?\([^)]+\)|#[0-9a-fA-F]{3,8}/);
           if (match) backgroundColor = match[0];
-        } else if (element.children.length > 0) {
+        // Skip child background lookup for native buttons and role="button" elements.
+        // Outline/ghost buttons are intentionally transparent; inheriting a child's
+        // background would misclassify them as fill buttons.
+        } else if (
+          element.children.length > 0 &&
+          tagName !== "button" &&
+          element.getAttribute("role") !== "button"
+        ) {
           for (const child of Array.from(element.children).slice(0, 3)) {
             const childBg = window.getComputedStyle(child as HTMLElement).backgroundColor;
             if (childBg !== "rgba(0, 0, 0, 0)" && childBg !== "transparent") {
@@ -348,7 +369,24 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         justifyContent: style.justifyContent,
         alignItems: style.alignItems,
         flexWrap: style.flexWrap,
-        borderRadius: parsePx(style.borderRadius),
+        borderRadius: (() => {
+          // Accordion triggers (aria-expanded) often have pill-shaped styling
+          // (high border-radius) that belongs to the trigger button, not the
+          // accordion panel container. Walk up to the nearest non-button ancestor
+          // and use its corner radius as the accordion's representative value.
+          if (element.hasAttribute("aria-expanded")) {
+            const parent = element.parentElement;
+            if (
+              parent &&
+              parent.tagName.toLowerCase() !== "body" &&
+              parent.tagName.toLowerCase() !== "html"
+            ) {
+              const parentRadius = parsePx(window.getComputedStyle(parent).borderRadius);
+              if (parentRadius !== undefined) return parentRadius;
+            }
+          }
+          return parsePx(style.borderRadius);
+        })(),
         role: element.getAttribute("role") ?? undefined,
         ariaExpanded: element.hasAttribute("aria-expanded")
           ? element.getAttribute("aria-expanded") === "true"
@@ -369,6 +407,8 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
           element instanceof HTMLTextAreaElement
             ? element.disabled
             : undefined,
+        landmark: getNearestLandmark(element),
+        pageY: Math.round(rect.top + window.scrollY),
         textColor: hasText ? style.color : undefined,
         backgroundColor,
         borderColor,
