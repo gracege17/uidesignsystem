@@ -536,31 +536,7 @@ function ComponentsSection({
 }) {
   const ui = getThemeClasses(theme);
   const STYLE_PRIORITY: Record<string, number> = { fill: 0, outline: 1, ghost: 2 };
-  const BUTTON_STYLES = ["fill", "outline", "ghost"] as const;
-
-  const baseButton = pickPrimaryButton(result.components);
-
-  // For each style, use a real extracted button if available; otherwise synthesize from base
-  const buttonVariants: Array<{ component: ExtractedComponent; synthesized: boolean }> =
-    baseButton
-      ? BUTTON_STYLES.map((style) => {
-          const real = result.components.find(
-            (c) =>
-              c.type === "Button" &&
-              c.variants.style === style &&
-              c.variants.state === "default"
-          );
-          if (real) return { component: real, synthesized: false };
-          return {
-            component: {
-              ...baseButton,
-              id: `${baseButton.id}-${style}`,
-              variants: { ...baseButton.variants, style }
-            },
-            synthesized: true
-          };
-        })
-      : [];
+  const heroButtons = pickHeroButtons(result.components);
 
   // Pick the best Card representative (fill > outline > ghost)
   const baseCard =
@@ -584,11 +560,9 @@ function ComponentsSection({
     <div className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
 
-      {buttonVariants.length > 0 && (() => {
-        const realVariants = buttonVariants.filter((v) => !v.synthesized);
-        if (realVariants.length === 0) return null;
-        const fillEntry = realVariants.find((v) => v.component.variants.style === "fill");
-        const fillComponent = fillEntry?.component ?? realVariants[0].component;
+      {heroButtons.length > 0 && (() => {
+        const fillComponent =
+          heroButtons.find((component) => component.variants.style === "fill") ?? heroButtons[0];
         const fillType = result.tokens.typography.find((t) => fillComponent.tokens.typography.includes(t.id));
         const fillPad = fillComponent.padding ?? fillComponent.autoLayout?.padding;
         const specs: { label: string; value: string }[] = [];
@@ -600,14 +574,16 @@ function ComponentsSection({
           <div className={`${ui.softPanel} p-5 md:col-span-2`}>
             <div className="flex items-start justify-between gap-3">
               <p className={`text-sm font-semibold ${ui.headingText}`}>Button</p>
-              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{realVariants.length} {realVariants.length === 1 ? "variant found" : "variants found"}</span>
+              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{heroButtons.length} {heroButtons.length === 1 ? "cta found" : "ctas found"}</span>
             </div>
             <div className={`mt-4 p-4 ${ui.previewPanel} space-y-5`}>
               <div className="flex flex-wrap items-center gap-8">
-                {realVariants.map(({ component }) => (
+                {heroButtons.map((component) => (
                   <div key={component.id} className="flex flex-col items-center gap-2">
                     <ComponentPreview component={component} tokens={result.tokens} theme={theme} showSpecs={false} />
-                    <p className={`text-[10px] capitalize ${ui.mutedText}`}>{component.variants.style}</p>
+                    <p className={`max-w-[180px] truncate text-[10px] ${ui.mutedText}`} title={component.textContent ?? component.source}>
+                      {component.textContent ?? component.name}
+                    </p>
                     <p className={`max-w-[140px] truncate text-[9px] ${ui.mutedText} opacity-60`} title={component.source}>{component.source}</p>
                   </div>
                 ))}
@@ -627,7 +603,7 @@ function ComponentsSection({
         );
       })()}
 
-      {!baseCard && (buttonVariants.length > 0 || otherCurated.length > 0) && (
+      {!baseCard && (heroButtons.length > 0 || otherCurated.length > 0) && (
         <div className={`${ui.softPanel} p-5 md:col-span-2 opacity-50`}>
           <div className="flex items-start justify-between gap-3">
             <p className={`text-sm font-semibold ${ui.headingText}`}>Card</p>
@@ -692,7 +668,7 @@ function ComponentsSection({
         </div>
       ))}
 
-      {buttonVariants.length === 0 && !baseCard && otherCurated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
+      {heroButtons.length === 0 && !baseCard && otherCurated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
       </div>
     </div>
   );
@@ -704,7 +680,30 @@ function pickPrimaryButton(components: ExtractedComponent[]): ExtractedComponent
     return undefined;
   }
 
-  return [...buttons].sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left))[0];
+  const defaultButtons = buttons.filter((component) => component.variants.state === "default");
+  const pool = defaultButtons.length > 0 ? defaultButtons : buttons;
+  const fillButtons = pool.filter((component) => component.variants.style === "fill");
+  const prioritized = fillButtons.length > 0 ? fillButtons : pool;
+
+  return [...prioritized].sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left))[0];
+}
+
+function pickHeroButtons(components: ExtractedComponent[]): ExtractedComponent[] {
+  const buttons = components.filter((component) => component.type === "Button");
+  if (buttons.length === 0) {
+    return [];
+  }
+
+  const defaultButtons = buttons.filter((component) => component.variants.state === "default");
+  const statePool = defaultButtons.length > 0 ? defaultButtons : buttons;
+  const fillOrOutline = statePool.filter(
+    (component) => component.variants.style === "fill" || component.variants.style === "outline"
+  );
+  const pool = fillOrOutline.length > 0 ? fillOrOutline : statePool;
+
+  return [...pool]
+    .sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left))
+    .slice(0, 2);
 }
 
 function scorePrimaryButton(component: ExtractedComponent): number {
