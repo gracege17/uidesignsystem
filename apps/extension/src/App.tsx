@@ -293,6 +293,7 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         height: parsePx(String(rect.height)),
         display: style.display,
         gap: parsePx(style.gap),
+        gridTemplateColumns: style.display === "grid" ? style.gridTemplateColumns : undefined,
         // Read padding from the element itself. If every side is zero, fall back to the first
         // child — button label spans often carry the real padding (e.g. Gusto-style wrappers).
         // We use a single source (self or child) so we never mix values from both.

@@ -282,12 +282,13 @@ function TypographySection({
       <div className="space-y-8">
         {scale.map(({ role, token }) => (
           <div key={token.id} className={`border-t pt-6 ${ui.rule}`}>
-            <div className={`mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>
+            <div className={`mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px_100px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>
               <span>{role} — {token.fontFamily}</span>
               <span>Font Size</span>
               <span>Line Height</span>
+              <span>Letter Space</span>
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_100px_100px] gap-4">
+            <div className="grid grid-cols-[minmax(0,1fr)_100px_100px_100px] gap-4">
               <p
                 className={`pr-6 ${ui.headingText}`}
                 style={{
@@ -302,6 +303,7 @@ function TypographySection({
               </p>
               <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.fontSize}px</p>
               <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.lineHeight}px</p>
+              <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.letterSpacing}px</p>
             </div>
           </div>
         ))}
@@ -710,11 +712,19 @@ function buildSummary(result: ExtractionResult): SummaryModel {
     return accumulator;
   }, {});
   const layoutPatterns = result.components
-    .filter((component) => component.autoLayout)
+    .filter((component) => {
+      const al = component.autoLayout;
+      if (!al) return false;
+      // Only keep components with a real column count derived from the DOM
+      if (!al.columns || al.columns < 2) return false;
+      // Exclude leaf components — layout containers have meaningful child counts
+      if (["Button", "Badge", "Input"].includes(component.type)) return false;
+      return true;
+    })
     .map((component) => ({
-      columns: inferColumns(component),
-      gap: component.autoLayout?.gap ?? 0,
-      direction: component.autoLayout?.direction ?? "horizontal"
+      columns: component.autoLayout!.columns!,
+      gap: component.autoLayout!.gap,
+      direction: component.autoLayout!.direction
     }))
     .sort((left, right) => right.columns - left.columns || right.gap - left.gap)
     .slice(0, 6);
@@ -747,14 +757,6 @@ function buildSummary(result: ExtractionResult): SummaryModel {
   };
 }
 
-function inferColumns(component: ExtractedComponent) {
-  const gap = component.autoLayout?.gap ?? 0;
-  if (gap >= 48) return 12;
-  if (gap >= 24) return 6;
-  if (gap >= 12) return 4;
-  if (gap > 0) return 3;
-  return 1;
-}
 
 function isNeutralColor(value: string) {
   const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
@@ -918,11 +920,11 @@ function buildColorCopy(summary: SummaryModel) {
 function buildTypographyCopy(summary: SummaryModel) {
   const lines = ["Typography"];
   if (summary.fontFamilies.length > 0) lines.push(`- Typefaces: ${summary.fontFamilies.join(", ")}`);
-  if (summary.h1) lines.push(`- H1: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight}`);
-  if (summary.h2) lines.push(`- H2: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight}`);
-  if (summary.h3) lines.push(`- H3: ${summary.h3.fontSize}px / ${summary.h3.lineHeight}px / weight ${summary.h3.fontWeight}`);
-  if (summary.body) lines.push(`- Body: ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight}`);
-  if (summary.caption) lines.push(`- Caption: ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight}`);
+  if (summary.h1) lines.push(`- H1: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight} / ls ${summary.h1.letterSpacing}px`);
+  if (summary.h2) lines.push(`- H2: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight} / ls ${summary.h2.letterSpacing}px`);
+  if (summary.h3) lines.push(`- H3: ${summary.h3.fontSize}px / ${summary.h3.lineHeight}px / weight ${summary.h3.fontWeight} / ls ${summary.h3.letterSpacing}px`);
+  if (summary.body) lines.push(`- Body: ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight} / ls ${summary.body.letterSpacing}px`);
+  if (summary.caption) lines.push(`- Caption: ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight} / ls ${summary.caption.letterSpacing}px`);
   return lines.join("\n");
 }
 

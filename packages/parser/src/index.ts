@@ -30,6 +30,7 @@ export interface SerializedStyleNode {
   justifyContent?: string;
   alignItems?: string;
   flexWrap?: string;
+  gridTemplateColumns?: string;
   borderRadius?: number | string;
   role?: string;
   href?: string;
@@ -430,6 +431,20 @@ function inferPadding(node: SerializedStyleNode): AutoLayout["padding"] | undefi
   return { top, right, bottom, left };
 }
 
+function parseGridColumns(gridTemplateColumns: string): number {
+  const trimmed = gridTemplateColumns.trim();
+  if (!trimmed || trimmed === "none") return 1;
+  // Count top-level space-separated track definitions (skip spaces inside parens)
+  let depth = 0;
+  let count = 1;
+  for (const ch of trimmed) {
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (ch === " " && depth === 0) count++;
+  }
+  return count;
+}
+
 function inferAutoLayout(node: SerializedStyleNode): AutoLayout | undefined {
   const display = node.display?.toLowerCase();
   if (!display || (display !== "flex" && display !== "inline-flex" && display !== "grid")) {
@@ -444,13 +459,25 @@ function inferAutoLayout(node: SerializedStyleNode): AutoLayout | undefined {
     left: normalizeLength(node.paddingLeft) ?? 0
   };
 
+  // Derive real column count from the DOM, not from gap heuristics.
+  // Grid: count tracks from grid-template-columns.
+  // Flex row: use direct child count as the column count.
+  let columns: number | undefined;
+  if (display === "grid" && node.gridTemplateColumns) {
+    columns = parseGridColumns(node.gridTemplateColumns);
+  } else if ((display === "flex" || display === "inline-flex") && inferDirection(node) === "horizontal") {
+    const childCount = node.childCount ?? 0;
+    if (childCount >= 2) columns = childCount;
+  }
+
   return {
     direction: display === "grid" ? "vertical" : inferDirection(node),
     gap,
     padding,
     primaryAlignment: mapAlignment(node.justifyContent),
     counterAlignment: mapAlignment(node.alignItems),
-    wrap: node.flexWrap === "wrap"
+    wrap: node.flexWrap === "wrap",
+    columns
   };
 }
 
@@ -631,7 +658,11 @@ function buildColorTokens(candidates: ColorCandidate[]): ColorToken[] {
 }
 
 function buildTypographyTokens(candidates: TypographyCandidate[]): TypographyToken[] {
+  // Always keep the largest-fontSize candidate even if it only appears once —
+  // hero headings are naturally unique on a page and would otherwise be filtered out.
+  const largestFontSize = candidates.reduce((max, c) => Math.max(max, c.fontSize), 0);
   const filtered = sortByPriority(candidates).filter((candidate) =>
+    candidate.fontSize === largestFontSize ||
     shouldKeepCandidate(candidate.count, candidates.length, "typography")
   );
   const usedNames = new Set<string>();

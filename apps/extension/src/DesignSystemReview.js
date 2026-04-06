@@ -70,13 +70,13 @@ function TypographySection({ tokens, summary, theme }) {
         seenIds.add(entry.token.id);
         return true;
     });
-    return (_jsxs("div", { className: "space-y-8", children: [_jsx("div", { className: `${ui.heroPanel} grid gap-10 ${summary.fontFamilies.length > 1 ? "md:grid-cols-2" : ""}`, children: summary.fontFamilies.length === 0 ? (_jsxs("div", { children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Typeface" }), _jsx("p", { className: `mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: "\u2014" })] })) : summary.fontFamilies.map((family) => (_jsxs("div", { children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Typeface" }), _jsx("p", { className: `mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: family })] }, family))) }), _jsx("div", { className: "space-y-8", children: scale.map(({ role, token }) => (_jsxs("div", { className: `border-t pt-6 ${ui.rule}`, children: [_jsxs("div", { className: `mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: [_jsxs("span", { children: [role, " \u2014 ", token.fontFamily] }), _jsx("span", { children: "Font Size" }), _jsx("span", { children: "Line Height" })] }), _jsxs("div", { className: "grid grid-cols-[minmax(0,1fr)_100px_100px] gap-4", children: [_jsx("p", { className: `pr-6 ${ui.headingText}`, style: {
+    return (_jsxs("div", { className: "space-y-8", children: [_jsx("div", { className: `${ui.heroPanel} grid gap-10 ${summary.fontFamilies.length > 1 ? "md:grid-cols-2" : ""}`, children: summary.fontFamilies.length === 0 ? (_jsxs("div", { children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Typeface" }), _jsx("p", { className: `mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: "\u2014" })] })) : summary.fontFamilies.map((family) => (_jsxs("div", { children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Typeface" }), _jsx("p", { className: `mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: family })] }, family))) }), _jsx("div", { className: "space-y-8", children: scale.map(({ role, token }) => (_jsxs("div", { className: `border-t pt-6 ${ui.rule}`, children: [_jsxs("div", { className: `mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px_100px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: [_jsxs("span", { children: [role, " \u2014 ", token.fontFamily] }), _jsx("span", { children: "Font Size" }), _jsx("span", { children: "Line Height" }), _jsx("span", { children: "Letter Space" })] }), _jsxs("div", { className: "grid grid-cols-[minmax(0,1fr)_100px_100px_100px] gap-4", children: [_jsx("p", { className: `pr-6 ${ui.headingText}`, style: {
                                         fontSize: `${Math.min(token.fontSize, 64)}px`,
                                         lineHeight: `${Math.min(token.lineHeight, 72)}px`,
                                         fontWeight: token.fontWeight,
                                         letterSpacing: `${token.letterSpacing}px`,
                                         textTransform: token.textTransform ?? "none"
-                                    }, children: "The quick brown fox jumps over the lazy dog" }), _jsxs("p", { className: `pt-2 text-sm ${ui.bodyText}`, children: [token.fontSize, "px"] }), _jsxs("p", { className: `pt-2 text-sm ${ui.bodyText}`, children: [token.lineHeight, "px"] })] })] }, token.id))) }), scale.length === 0 ? _jsx(EmptyState, { message: "No clear typography scale was found.", theme: theme }) : null] }));
+                                    }, children: "The quick brown fox jumps over the lazy dog" }), _jsxs("p", { className: `pt-2 text-sm ${ui.bodyText}`, children: [token.fontSize, "px"] }), _jsxs("p", { className: `pt-2 text-sm ${ui.bodyText}`, children: [token.lineHeight, "px"] }), _jsxs("p", { className: `pt-2 text-sm ${ui.bodyText}`, children: [token.letterSpacing, "px"] })] })] }, token.id))) }), scale.length === 0 ? _jsx(EmptyState, { message: "No clear typography scale was found.", theme: theme }) : null] }));
 }
 function LayoutSection({ components, summary, theme }) {
     const ui = getThemeClasses(theme);
@@ -220,11 +220,22 @@ function buildSummary(result) {
         return accumulator;
     }, {});
     const layoutPatterns = result.components
-        .filter((component) => component.autoLayout)
+        .filter((component) => {
+        const al = component.autoLayout;
+        if (!al)
+            return false;
+        // Only keep components with a real column count derived from the DOM
+        if (!al.columns || al.columns < 2)
+            return false;
+        // Exclude leaf components — layout containers have meaningful child counts
+        if (["Button", "Badge", "Input"].includes(component.type))
+            return false;
+        return true;
+    })
         .map((component) => ({
-        columns: inferColumns(component),
-        gap: component.autoLayout?.gap ?? 0,
-        direction: component.autoLayout?.direction ?? "horizontal"
+        columns: component.autoLayout.columns,
+        gap: component.autoLayout.gap,
+        direction: component.autoLayout.direction
     }))
         .sort((left, right) => right.columns - left.columns || right.gap - left.gap)
         .slice(0, 6);
@@ -254,18 +265,6 @@ function buildSummary(result) {
         layoutPatterns,
         gridColumns: layoutPatterns[0]?.columns ?? 0
     };
-}
-function inferColumns(component) {
-    const gap = component.autoLayout?.gap ?? 0;
-    if (gap >= 48)
-        return 12;
-    if (gap >= 24)
-        return 6;
-    if (gap >= 12)
-        return 4;
-    if (gap > 0)
-        return 3;
-    return 1;
 }
 function isNeutralColor(value) {
     const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
@@ -412,15 +411,15 @@ function buildTypographyCopy(summary) {
     if (summary.fontFamilies.length > 0)
         lines.push(`- Typefaces: ${summary.fontFamilies.join(", ")}`);
     if (summary.h1)
-        lines.push(`- H1: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight}`);
+        lines.push(`- H1: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight} / ls ${summary.h1.letterSpacing}px`);
     if (summary.h2)
-        lines.push(`- H2: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight}`);
+        lines.push(`- H2: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight} / ls ${summary.h2.letterSpacing}px`);
     if (summary.h3)
-        lines.push(`- H3: ${summary.h3.fontSize}px / ${summary.h3.lineHeight}px / weight ${summary.h3.fontWeight}`);
+        lines.push(`- H3: ${summary.h3.fontSize}px / ${summary.h3.lineHeight}px / weight ${summary.h3.fontWeight} / ls ${summary.h3.letterSpacing}px`);
     if (summary.body)
-        lines.push(`- Body: ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight}`);
+        lines.push(`- Body: ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight} / ls ${summary.body.letterSpacing}px`);
     if (summary.caption)
-        lines.push(`- Caption: ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight}`);
+        lines.push(`- Caption: ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight} / ls ${summary.caption.letterSpacing}px`);
     return lines.join("\n");
 }
 function buildLayoutCopy(summary) {

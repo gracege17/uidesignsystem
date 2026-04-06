@@ -248,6 +248,10 @@ export interface AutoLayout {
    * Whether children should wrap onto additional lines.
    */
   wrap?: boolean;
+  /**
+   * Number of columns — track count for grid, child count for flex rows.
+   */
+  columns?: number;
 }
 
 /**
