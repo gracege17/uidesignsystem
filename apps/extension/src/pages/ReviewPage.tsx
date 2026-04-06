@@ -100,6 +100,24 @@ export default function ReviewPage() {
             Loading review data...
           </div>
         )}
+
+        <div className="mt-10 flex justify-end">
+          <p className={`text-sm ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
+            Created by{" "}
+            <a
+              href="https://gracege.space"
+              target="_blank"
+              rel="noreferrer"
+              className={`font-medium underline decoration-1 underline-offset-4 transition ${
+                theme === "light"
+                  ? "text-slate-700 hover:text-slate-900"
+                  : "text-slate-200 hover:text-white"
+              }`}
+            >
+              Grace Ge
+            </a>
+          </p>
+        </div>
       </section>
     </main>
   );
