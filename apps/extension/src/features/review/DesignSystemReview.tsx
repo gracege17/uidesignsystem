@@ -11,6 +11,9 @@ const REVIEW_TABS = [
 
 type ReviewTab = (typeof REVIEW_TABS)[number]["id"];
 type ThemeMode = "light" | "dark";
+type HeroButtonSlotLabel = "Main CTA" | "Secondary CTA" | "Other Button";
+type HeroButtonSlot = { label: HeroButtonSlotLabel; component?: ExtractedComponent };
+type FilledHeroButtonSlot = { label: HeroButtonSlotLabel; component: ExtractedComponent };
 
 export default function DesignSystemReview({
   result,
@@ -536,7 +539,10 @@ function ComponentsSection({
 }) {
   const ui = getThemeClasses(theme);
   const STYLE_PRIORITY: Record<string, number> = { fill: 0, outline: 1, ghost: 2 };
-  const heroButtons = pickHeroButtons(result.components);
+  const heroButtonSlots = pickHeroButtons(result.components);
+  const visibleHeroButtons = heroButtonSlots.filter(
+    (entry): entry is FilledHeroButtonSlot => Boolean(entry.component)
+  );
 
   // Pick the best Card representative (fill > outline > ghost)
   const baseCard =
@@ -560,9 +566,10 @@ function ComponentsSection({
     <div className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
 
-      {heroButtons.length > 0 && (() => {
+      {visibleHeroButtons.length > 0 && (() => {
         const fillComponent =
-          heroButtons.find((component) => component.variants.style === "fill") ?? heroButtons[0];
+          visibleHeroButtons.find((entry) => entry.label === "Main CTA")?.component ??
+          visibleHeroButtons[0].component;
         const fillType = result.tokens.typography.find((t) => fillComponent.tokens.typography.includes(t.id));
         const fillPad = fillComponent.padding ?? fillComponent.autoLayout?.padding;
         const specs: { label: string; value: string }[] = [];
@@ -574,13 +581,14 @@ function ComponentsSection({
           <div className={`${ui.softPanel} p-5 md:col-span-2`}>
             <div className="flex items-start justify-between gap-3">
               <p className={`text-sm font-semibold ${ui.headingText}`}>Button</p>
-              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{heroButtons.length} {heroButtons.length === 1 ? "cta found" : "ctas found"}</span>
+              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{visibleHeroButtons.length} {visibleHeroButtons.length === 1 ? "cta found" : "ctas found"}</span>
             </div>
             <div className={`mt-4 p-4 ${ui.previewPanel} space-y-5`}>
               <div className="flex flex-wrap items-center gap-8">
-                {heroButtons.map((component) => (
+                {visibleHeroButtons.map(({ label, component }) => (
                   <div key={component.id} className="flex flex-col items-center gap-2">
                     <ComponentPreview component={component} tokens={result.tokens} theme={theme} showSpecs={false} />
+                    <p className={`text-[10px] font-medium ${ui.mutedText}`}>{label}</p>
                     <p className={`max-w-[180px] truncate text-[10px] ${ui.mutedText}`} title={component.textContent ?? component.source}>
                       {component.textContent ?? component.name}
                     </p>
@@ -603,7 +611,7 @@ function ComponentsSection({
         );
       })()}
 
-      {!baseCard && (heroButtons.length > 0 || otherCurated.length > 0) && (
+      {!baseCard && (visibleHeroButtons.length > 0 || otherCurated.length > 0) && (
         <div className={`${ui.softPanel} p-5 md:col-span-2 opacity-50`}>
           <div className="flex items-start justify-between gap-3">
             <p className={`text-sm font-semibold ${ui.headingText}`}>Card</p>
@@ -668,7 +676,7 @@ function ComponentsSection({
         </div>
       ))}
 
-      {heroButtons.length === 0 && !baseCard && otherCurated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
+      {visibleHeroButtons.length === 0 && !baseCard && otherCurated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
       </div>
     </div>
   );
@@ -688,7 +696,7 @@ function pickPrimaryButton(components: ExtractedComponent[]): ExtractedComponent
   return [...prioritized].sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left))[0];
 }
 
-function pickHeroButtons(components: ExtractedComponent[]): ExtractedComponent[] {
+function pickHeroButtons(components: ExtractedComponent[]): HeroButtonSlot[] {
   const buttons = components.filter((component) => component.type === "Button");
   if (buttons.length === 0) {
     return [];
@@ -696,14 +704,24 @@ function pickHeroButtons(components: ExtractedComponent[]): ExtractedComponent[]
 
   const defaultButtons = buttons.filter((component) => component.variants.state === "default");
   const statePool = defaultButtons.length > 0 ? defaultButtons : buttons;
-  const fillOrOutline = statePool.filter(
-    (component) => component.variants.style === "fill" || component.variants.style === "outline"
-  );
-  const pool = fillOrOutline.length > 0 ? fillOrOutline : statePool;
+  const ranked = [...statePool].sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left));
 
-  return [...pool]
-    .sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left))
-    .slice(0, 2);
+  const mainCta = ranked.find((component) => component.variants.style === "fill") ?? ranked[0];
+  const remainingAfterMain = ranked.filter((component) => component.id !== mainCta?.id);
+
+  const secondaryCta =
+    remainingAfterMain.find((component) => component.variants.style === "outline") ??
+    remainingAfterMain[0];
+  const remainingAfterSecondary = remainingAfterMain.filter(
+    (component) => component.id !== secondaryCta?.id
+  );
+  const otherButton = remainingAfterSecondary[0];
+
+  return [
+    { label: "Main CTA", component: mainCta },
+    { label: "Secondary CTA", component: secondaryCta },
+    { label: "Other Button", component: otherButton }
+  ];
 }
 
 function scorePrimaryButton(component: ExtractedComponent): number {
