@@ -383,6 +383,23 @@ export interface ExtractedComponent extends ComponentBase {
 }
 
 /**
+ * Spacing and layout metrics derived from the page structure.
+ */
+export interface LayoutMetrics {
+  /** Max-width of the widest constrained content container, in px. */
+  contentWidth?: number;
+  /** Horizontal padding from the page edge to the main content area, in px. */
+  pageMargin?: number;
+  /** Deduplicated, sorted list of spacing values found across gap and padding on the page. */
+  spacingScale: number[];
+  /** Dominant CSS grid system, if one is found. */
+  grid?: {
+    columns: number;
+    gap: number;
+  };
+}
+
+/**
  * Aggregates both foundation tokens and inferred components from a single extraction pass.
  */
 export interface ExtractionResult {
@@ -394,4 +411,8 @@ export interface ExtractionResult {
    * Extracted reusable component patterns.
    */
   components: ExtractedComponent[];
+  /**
+   * Spacing and layout metrics derived from the page structure.
+   */
+  layout: LayoutMetrics;
 }

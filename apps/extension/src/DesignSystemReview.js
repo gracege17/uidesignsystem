@@ -4,7 +4,7 @@ const REVIEW_TABS = [
     { id: "overview", label: "Overview" },
     { id: "color", label: "Color" },
     { id: "typography", label: "Typography" },
-    { id: "layout", label: "Grids" },
+    { id: "layout", label: "Spacing" },
     { id: "components", label: "Components" }
 ];
 export default function DesignSystemReview({ result, layout = "stacked", theme = "light" }) {
@@ -23,7 +23,7 @@ export default function DesignSystemReview({ result, layout = "stacked", theme =
     if (layout === "split") {
         return (_jsxs("div", { className: "grid min-h-[780px] grid-cols-[180px_minmax(0,1fr)] gap-8", children: [_jsx("aside", { className: `border-r pr-6 ${ui.sidebarBorder}`, children: _jsxs("div", { className: "sticky top-8", children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.24em] ${ui.mutedText}`, children: "Basics" }), _jsx("nav", { className: "mt-6 space-y-1", children: REVIEW_TABS.map((tab) => (_jsx("button", { type: "button", onClick: () => setActiveTab(tab.id), className: `block w-full border-l-2 py-2 pl-4 text-left text-sm transition ${activeTab === tab.id ? ui.navActive : ui.navIdle}`, children: tab.label }, tab.id))) })] }) }), _jsx("main", { className: "min-w-0", children: _jsx(SplitSection, { tab: activeTab, result: result, summary: summary, theme: theme, copiedKey: copiedKey, onCopy: copySection }) })] }));
     }
-    return (_jsxs("div", { className: "space-y-12", children: [_jsx(SectionShell, { title: "Overview", subtitle: "Key extracted foundations and primary signals.", theme: theme, copyLabel: "Copy Everything", copied: copiedKey === "everything", onCopy: () => void copySection("everything"), children: _jsx(OverviewSection, { summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Color Styles", subtitle: "Starter color styles extracted from the page.", theme: theme, copyLabel: "Copy Color", copied: copiedKey === "color", onCopy: () => void copySection("color"), children: _jsx(ColorSection, { tokens: result.tokens, summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Typography", subtitle: "Likely display, heading, and body styles.", theme: theme, copyLabel: "Copy Typography", copied: copiedKey === "typography", onCopy: () => void copySection("typography"), children: _jsx(TypographySection, { tokens: result.tokens, summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Grid & Layout", subtitle: "Common layout patterns and spacing primitives.", theme: theme, copyLabel: "Copy Layout", copied: copiedKey === "layout", onCopy: () => void copySection("layout"), children: _jsx(LayoutSection, { components: result.components, summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Components", subtitle: "Top reusable component families extracted from the page.", theme: theme, copyLabel: "Copy Components", copied: copiedKey === "components", onCopy: () => void copySection("components"), children: _jsx(ComponentsSection, { result: result, summary: summary, theme: theme }) })] }));
+    return (_jsxs("div", { className: "space-y-12", children: [_jsx(SectionShell, { title: "Overview", subtitle: "Key extracted foundations and primary signals.", theme: theme, copyLabel: "Copy Everything", copied: copiedKey === "everything", onCopy: () => void copySection("everything"), children: _jsx(OverviewSection, { summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Color Styles", subtitle: "Starter color styles extracted from the page.", theme: theme, copyLabel: "Copy Color", copied: copiedKey === "color", onCopy: () => void copySection("color"), children: _jsx(ColorSection, { tokens: result.tokens, summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Typography", subtitle: "Likely display, heading, and body styles.", theme: theme, copyLabel: "Copy Typography", copied: copiedKey === "typography", onCopy: () => void copySection("typography"), children: _jsx(TypographySection, { tokens: result.tokens, summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Spacing & Layout", subtitle: "Content width, page margins, and spacing scale extracted from the page.", theme: theme, copyLabel: "Copy Layout", copied: copiedKey === "layout", onCopy: () => void copySection("layout"), children: _jsx(LayoutSection, { layout: result.layout, theme: theme }) }), _jsx(SectionShell, { title: "Components", subtitle: "Top reusable component families extracted from the page.", theme: theme, copyLabel: "Copy Components", copied: copiedKey === "components", onCopy: () => void copySection("components"), children: _jsx(ComponentsSection, { result: result, summary: summary, theme: theme }) })] }));
 }
 function SplitSection({ tab, result, summary, theme, copiedKey, onCopy }) {
     if (tab === "overview") {
@@ -36,7 +36,7 @@ function SplitSection({ tab, result, summary, theme, copiedKey, onCopy }) {
         return (_jsx(SectionShell, { title: "Typography", subtitle: "Likely display, heading, and body specimens.", theme: theme, copyLabel: "Copy Typography", copied: copiedKey === "typography", onCopy: () => void onCopy("typography"), children: _jsx(TypographySection, { tokens: result.tokens, summary: summary, theme: theme }) }));
     }
     if (tab === "layout") {
-        return (_jsx(SectionShell, { title: "Grid & Layout", subtitle: "Visual layout primitives instead of raw auto-layout metadata.", theme: theme, copyLabel: "Copy Layout", copied: copiedKey === "layout", onCopy: () => void onCopy("layout"), children: _jsx(LayoutSection, { components: result.components, summary: summary, theme: theme }) }));
+        return (_jsx(SectionShell, { title: "Spacing & Layout", subtitle: "Content width, page margins, and spacing scale extracted from the page.", theme: theme, copyLabel: "Copy Layout", copied: copiedKey === "layout", onCopy: () => void onCopy("layout"), children: _jsx(LayoutSection, { layout: result.layout, theme: theme }) }));
     }
     return (_jsx(SectionShell, { title: "Components", subtitle: "Curated gallery of the most repeated component families.", theme: theme, copyLabel: "Copy Components", copied: copiedKey === "components", onCopy: () => void onCopy("components"), children: _jsx(ComponentsSection, { result: result, summary: summary, theme: theme }) }));
 }
@@ -78,10 +78,10 @@ function TypographySection({ tokens, summary, theme }) {
                                         textTransform: token.textTransform ?? "none"
                                     }, children: "The quick brown fox jumps over the lazy dog" }), _jsxs("p", { className: `pt-2 text-sm ${ui.bodyText}`, children: [token.fontSize, "px"] }), _jsxs("p", { className: `pt-2 text-sm ${ui.bodyText}`, children: [token.lineHeight, "px"] }), _jsxs("p", { className: `pt-2 text-sm ${ui.bodyText}`, children: [token.letterSpacing, "px"] })] })] }, token.id))) }), scale.length === 0 ? _jsx(EmptyState, { message: "No clear typography scale was found.", theme: theme }) : null] }));
 }
-function LayoutSection({ components, summary, theme }) {
+function LayoutSection({ layout, theme }) {
     const ui = getThemeClasses(theme);
-    const layouts = summary.layoutPatterns.slice(0, 6);
-    return (_jsxs("div", { className: "space-y-8", children: [_jsxs("div", { className: `p-8 ${ui.heroPanel}`, children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Desktop" }), _jsx("h2", { className: `mt-3 text-5xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: "Grid & Layout" }), _jsxs("div", { className: `mt-6 space-y-2 text-sm ${ui.heroBodyText}`, children: [_jsxs("p", { children: [summary.gridColumns, " common repeated layout groups"] }), _jsx("p", { children: summary.layoutPatterns[0] ? `typical gap ${summary.layoutPatterns[0].gap}px` : "gap not detected" }), _jsxs("p", { children: [components.filter((component) => component.autoLayout).length, " spaced layout candidates"] })] })] }), _jsx("div", { className: "space-y-4", children: layouts.map((pattern, index) => (_jsxs("div", { className: `border-t pt-4 ${ui.rule}`, children: [_jsxs("div", { className: `mb-2 flex items-center justify-between text-sm ${ui.bodyText}`, children: [_jsxs("span", { children: [pattern.columns, " columns"] }), _jsxs("span", { children: [pattern.direction, " \u00B7 gap ", pattern.gap] })] }), _jsx("div", { className: "grid gap-2", style: { gridTemplateColumns: `repeat(${pattern.columns}, minmax(0, 1fr))` }, children: Array.from({ length: pattern.columns }).map((_, columnIndex) => (_jsx("div", { className: `${ui.gridCell} py-3 text-center text-sm`, children: pattern.columns === 1 ? "1" : `${columnIndex + 1}` }, columnIndex))) })] }, `${pattern.direction}-${pattern.gap}-${index}`))) }), layouts.length === 0 ? _jsx(EmptyState, { message: "No strong layout patterns were found.", theme: theme }) : null] }));
+    const hasAnything = layout.contentWidth || layout.pageMargin || layout.spacingScale.length > 0 || layout.grid;
+    return (_jsxs("div", { className: "space-y-8", children: [(layout.contentWidth || layout.pageMargin) && (_jsxs("div", { className: "space-y-3", children: [_jsx("p", { className: `text-xs font-semibold uppercase tracking-[0.18em] ${ui.mutedText}`, children: "Canvas" }), _jsxs("div", { className: `grid grid-cols-2 gap-4`, children: [layout.contentWidth && (_jsxs("div", { className: `${ui.softPanel} p-4 space-y-1`, children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: "Content width" }), _jsxs("p", { className: `text-2xl font-semibold tabular-nums ${ui.headingText}`, children: [layout.contentWidth, _jsx("span", { className: `text-sm font-normal ml-1 ${ui.mutedText}`, children: "px" })] })] })), layout.pageMargin && (_jsxs("div", { className: `${ui.softPanel} p-4 space-y-1`, children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: "Page margin" }), _jsxs("p", { className: `text-2xl font-semibold tabular-nums ${ui.headingText}`, children: [layout.pageMargin, _jsx("span", { className: `text-sm font-normal ml-1 ${ui.mutedText}`, children: "px" })] })] }))] })] })), layout.grid && (_jsxs("div", { className: "space-y-3", children: [_jsx("p", { className: `text-xs font-semibold uppercase tracking-[0.18em] ${ui.mutedText}`, children: "Grid system" }), _jsxs("div", { className: `${ui.softPanel} p-4 space-y-3`, children: [_jsxs("div", { className: `flex items-center justify-between text-sm ${ui.bodyText}`, children: [_jsxs("span", { children: [layout.grid.columns, " columns"] }), _jsxs("span", { children: ["gap ", layout.grid.gap, "px"] })] }), _jsx("div", { className: "flex gap-1.5", children: Array.from({ length: Math.min(layout.grid.columns, 12) }).map((_, i) => (_jsx("div", { className: `h-8 flex-1 rounded ${ui.gridCell}` }, i))) })] })] })), layout.spacingScale.length > 0 && (_jsxs("div", { className: "space-y-3", children: [_jsx("p", { className: `text-xs font-semibold uppercase tracking-[0.18em] ${ui.mutedText}`, children: "Spacing scale" }), _jsx("div", { className: "flex flex-wrap gap-3", children: layout.spacingScale.map((value) => (_jsxs("div", { className: "flex flex-col items-center gap-2", children: [_jsx("div", { className: `${ui.gridCell} rounded`, style: { width: `${Math.min(value, 80)}px`, height: `${Math.min(value, 80)}px` } }), _jsx("span", { className: `text-[11px] tabular-nums ${ui.mutedText}`, children: value })] }, value))) })] })), !hasAnything && _jsx(EmptyState, { message: "No spacing or layout data could be extracted from this page.", theme: theme })] }));
 }
 function ComponentsSection({ result, summary, theme }) {
     const ui = getThemeClasses(theme);
@@ -219,31 +219,11 @@ function buildSummary(result) {
         accumulator[component.type] = (accumulator[component.type] ?? 0) + 1;
         return accumulator;
     }, {});
-    const layoutPatterns = result.components
-        .filter((component) => {
-        const al = component.autoLayout;
-        if (!al)
-            return false;
-        // Only keep components with a real column count derived from the DOM
-        if (!al.columns || al.columns < 2)
-            return false;
-        // Exclude leaf components — layout containers have meaningful child counts
-        if (["Button", "Badge", "Input"].includes(component.type))
-            return false;
-        return true;
-    })
-        .map((component) => ({
-        columns: component.autoLayout.columns,
-        gap: component.autoLayout.gap,
-        direction: component.autoLayout.direction
-    }))
-        .sort((left, right) => right.columns - left.columns || right.gap - left.gap)
-        .slice(0, 6);
     return {
         counts: {
             colors: result.tokens.colors.length,
             typography: result.tokens.typography.length,
-            layouts: result.components.filter((component) => component.autoLayout).length,
+            layouts: result.layout.spacingScale.length,
             components: result.components.length
         },
         primaryColor: primaryColors[0] ?? result.tokens.colors[0],
@@ -261,9 +241,7 @@ function buildSummary(result) {
             primary: primaryColors.slice(0, 4),
             neutral: neutralColors.slice(0, 5),
             accent: accentColors.slice(0, 6)
-        },
-        layoutPatterns,
-        gridColumns: layoutPatterns[0]?.columns ?? 0
+        }
     };
 }
 function isNeutralColor(value) {
@@ -424,11 +402,8 @@ function buildTypographyCopy(summary) {
         lines.push(`- Caption: ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight} / ls ${summary.caption.letterSpacing}px`);
     return lines.join("\n");
 }
-function buildLayoutCopy(summary) {
-    return [
-        "Layout",
-        ...summary.layoutPatterns.map((pattern) => `- ${pattern.columns} column pattern, ${pattern.direction} direction, gap ${pattern.gap}px`)
-    ].join("\n");
+function buildLayoutCopy(_summary) {
+    return "Spacing & Layout — see extension for spacing scale, content width, and grid details.";
 }
 function buildComponentsCopy(summary) {
     return [

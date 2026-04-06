@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import type { DesignTokens, ExtractedComponent, ExtractionResult } from "@extractor/types";
+import type { DesignTokens, ExtractedComponent, ExtractionResult, LayoutMetrics } from "@extractor/types";
 
 const REVIEW_TABS = [
   { id: "overview", label: "Overview" },
   { id: "color", label: "Color" },
   { id: "typography", label: "Typography" },
-  { id: "layout", label: "Grids" },
+  { id: "layout", label: "Spacing" },
   { id: "components", label: "Components" }
 ] as const;
 
@@ -83,8 +83,8 @@ export default function DesignSystemReview({
       <SectionShell title="Typography" subtitle="Likely display, heading, and body styles." theme={theme} copyLabel="Copy Typography" copied={copiedKey === "typography"} onCopy={() => void copySection("typography")}>
         <TypographySection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
-      <SectionShell title="Grid & Layout" subtitle="Common layout patterns and spacing primitives." theme={theme} copyLabel="Copy Layout" copied={copiedKey === "layout"} onCopy={() => void copySection("layout")}>
-        <LayoutSection components={result.components} summary={summary} theme={theme} />
+      <SectionShell title="Spacing & Layout" subtitle="Content width, page margins, and spacing scale extracted from the page." theme={theme} copyLabel="Copy Layout" copied={copiedKey === "layout"} onCopy={() => void copySection("layout")}>
+        <LayoutSection layout={result.layout} theme={theme} />
       </SectionShell>
       <SectionShell title="Components" subtitle="Top reusable component families extracted from the page." theme={theme} copyLabel="Copy Components" copied={copiedKey === "components"} onCopy={() => void copySection("components")}>
         <ComponentsSection result={result} summary={summary} theme={theme} />
@@ -134,8 +134,8 @@ function SplitSection({
 
   if (tab === "layout") {
     return (
-      <SectionShell title="Grid & Layout" subtitle="Visual layout primitives instead of raw auto-layout metadata." theme={theme} copyLabel="Copy Layout" copied={copiedKey === "layout"} onCopy={() => void onCopy("layout")}>
-        <LayoutSection components={result.components} summary={summary} theme={theme} />
+      <SectionShell title="Spacing & Layout" subtitle="Content width, page margins, and spacing scale extracted from the page." theme={theme} copyLabel="Copy Layout" copied={copiedKey === "layout"} onCopy={() => void onCopy("layout")}>
+        <LayoutSection layout={result.layout} theme={theme} />
       </SectionShell>
     );
   }
@@ -318,48 +318,76 @@ function TypographySection({
 }
 
 function LayoutSection({
-  components,
-  summary,
+  layout,
   theme
 }: {
-  components: ExtractedComponent[];
-  summary: SummaryModel;
+  layout: LayoutMetrics;
   theme: ThemeMode;
 }) {
   const ui = getThemeClasses(theme);
-  const layouts = summary.layoutPatterns.slice(0, 6);
+  const hasAnything = layout.contentWidth || layout.pageMargin || layout.spacingScale.length > 0 || layout.grid;
 
   return (
     <div className="space-y-8">
-      <div className={`p-8 ${ui.heroPanel}`}>
-        <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>Desktop</p>
-        <h2 className={`mt-3 text-5xl font-semibold tracking-tight ${ui.heroHeadingText}`}>Grid & Layout</h2>
-        <div className={`mt-6 space-y-2 text-sm ${ui.heroBodyText}`}>
-          <p>{summary.gridColumns} common repeated layout groups</p>
-          <p>{summary.layoutPatterns[0] ? `typical gap ${summary.layoutPatterns[0].gap}px` : "gap not detected"}</p>
-          <p>{components.filter((component) => component.autoLayout).length} spaced layout candidates</p>
-        </div>
-      </div>
 
-      <div className="space-y-4">
-        {layouts.map((pattern, index) => (
-          <div key={`${pattern.direction}-${pattern.gap}-${index}`} className={`border-t pt-4 ${ui.rule}`}>
-            <div className={`mb-2 flex items-center justify-between text-sm ${ui.bodyText}`}>
-              <span>{pattern.columns} columns</span>
-              <span>{pattern.direction} · gap {pattern.gap}</span>
+      {/* Content width + page margin */}
+      {(layout.contentWidth || layout.pageMargin) && (
+        <div className="space-y-3">
+          <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${ui.mutedText}`}>Canvas</p>
+          <div className={`grid grid-cols-2 gap-4`}>
+            {layout.contentWidth && (
+              <div className={`${ui.softPanel} p-4 space-y-1`}>
+                <p className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>Content width</p>
+                <p className={`text-2xl font-semibold tabular-nums ${ui.headingText}`}>{layout.contentWidth}<span className={`text-sm font-normal ml-1 ${ui.mutedText}`}>px</span></p>
+              </div>
+            )}
+            {layout.pageMargin && (
+              <div className={`${ui.softPanel} p-4 space-y-1`}>
+                <p className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>Page margin</p>
+                <p className={`text-2xl font-semibold tabular-nums ${ui.headingText}`}>{layout.pageMargin}<span className={`text-sm font-normal ml-1 ${ui.mutedText}`}>px</span></p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CSS grid system */}
+      {layout.grid && (
+        <div className="space-y-3">
+          <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${ui.mutedText}`}>Grid system</p>
+          <div className={`${ui.softPanel} p-4 space-y-3`}>
+            <div className={`flex items-center justify-between text-sm ${ui.bodyText}`}>
+              <span>{layout.grid.columns} columns</span>
+              <span>gap {layout.grid.gap}px</span>
             </div>
-            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${pattern.columns}, minmax(0, 1fr))` }}>
-              {Array.from({ length: pattern.columns }).map((_, columnIndex) => (
-                <div key={columnIndex} className={`${ui.gridCell} py-3 text-center text-sm`}>
-                  {pattern.columns === 1 ? "1" : `${columnIndex + 1}`}
-                </div>
+            <div className="flex gap-1.5">
+              {Array.from({ length: Math.min(layout.grid.columns, 12) }).map((_, i) => (
+                <div key={i} className={`h-8 flex-1 rounded ${ui.gridCell}`} />
               ))}
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
-      {layouts.length === 0 ? <EmptyState message="No strong layout patterns were found." theme={theme} /> : null}
+      {/* Spacing scale */}
+      {layout.spacingScale.length > 0 && (
+        <div className="space-y-3">
+          <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${ui.mutedText}`}>Spacing scale</p>
+          <div className="flex flex-wrap gap-3">
+            {layout.spacingScale.map((value) => (
+              <div key={value} className="flex flex-col items-center gap-2">
+                <div
+                  className={`${ui.gridCell} rounded`}
+                  style={{ width: `${Math.min(value, 80)}px`, height: `${Math.min(value, 80)}px` }}
+                />
+                <span className={`text-[11px] tabular-nums ${ui.mutedText}`}>{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!hasAnything && <EmptyState message="No spacing or layout data could be extracted from this page." theme={theme} />}
     </div>
   );
 }
@@ -688,8 +716,6 @@ interface SummaryModel {
     neutral: DesignTokens["colors"];
     accent: DesignTokens["colors"];
   };
-  layoutPatterns: Array<{ columns: number; gap: number; direction: string }>;
-  gridColumns: number;
 }
 
 function buildSummary(result: ExtractionResult): SummaryModel {
@@ -714,29 +740,12 @@ function buildSummary(result: ExtractionResult): SummaryModel {
     accumulator[component.type] = (accumulator[component.type] ?? 0) + 1;
     return accumulator;
   }, {});
-  const layoutPatterns = result.components
-    .filter((component) => {
-      const al = component.autoLayout;
-      if (!al) return false;
-      // Only keep components with a real column count derived from the DOM
-      if (!al.columns || al.columns < 2) return false;
-      // Exclude leaf components — layout containers have meaningful child counts
-      if (["Button", "Badge", "Input"].includes(component.type)) return false;
-      return true;
-    })
-    .map((component) => ({
-      columns: component.autoLayout!.columns!,
-      gap: component.autoLayout!.gap,
-      direction: component.autoLayout!.direction
-    }))
-    .sort((left, right) => right.columns - left.columns || right.gap - left.gap)
-    .slice(0, 6);
 
   return {
     counts: {
       colors: result.tokens.colors.length,
       typography: result.tokens.typography.length,
-      layouts: result.components.filter((component) => component.autoLayout).length,
+      layouts: result.layout.spacingScale.length,
       components: result.components.length
     },
     primaryColor: primaryColors[0] ?? result.tokens.colors[0],
@@ -754,9 +763,7 @@ function buildSummary(result: ExtractionResult): SummaryModel {
       primary: primaryColors.slice(0, 4),
       neutral: neutralColors.slice(0, 5),
       accent: accentColors.slice(0, 6)
-    },
-    layoutPatterns,
-    gridColumns: layoutPatterns[0]?.columns ?? 0
+    }
   };
 }
 
@@ -934,11 +941,8 @@ function buildTypographyCopy(summary: SummaryModel) {
   return lines.join("\n");
 }
 
-function buildLayoutCopy(summary: SummaryModel) {
-  return [
-    "Layout",
-    ...summary.layoutPatterns.map((pattern) => `- ${pattern.columns} column pattern, ${pattern.direction} direction, gap ${pattern.gap}px`)
-  ].join("\n");
+function buildLayoutCopy(_summary: SummaryModel) {
+  return "Spacing & Layout — see extension for spacing scale, content width, and grid details.";
 }
 
 function buildComponentsCopy(summary: SummaryModel) {

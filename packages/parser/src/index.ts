@@ -10,6 +10,7 @@ import type {
   EffectToken,
   ExtractedComponent,
   FontWeight,
+  LayoutMetrics,
   TypographyToken
 } from "@extractor/types";
 
@@ -31,6 +32,7 @@ export interface SerializedStyleNode {
   alignItems?: string;
   flexWrap?: string;
   gridTemplateColumns?: string;
+  maxWidth?: number;
   borderRadius?: number | string;
   role?: string;
   href?: string;
@@ -183,10 +185,69 @@ const PREFERRED_SOURCE_TERMS = [
 
 export function extractDesignSystem(
   nodes: SerializedStyleNode[] = []
-): { tokens: DesignTokens; components: ExtractedComponent[] } {
+): { tokens: DesignTokens; components: ExtractedComponent[]; layout: LayoutMetrics } {
   const tokens = extractTokens(nodes);
   const components = extractComponents(nodes, tokens);
-  return { tokens, components };
+  const layout = extractLayoutMetrics(nodes);
+  return { tokens, components, layout };
+}
+
+export function extractLayoutMetrics(nodes: SerializedStyleNode[]): LayoutMetrics {
+  // Spacing scale: collect all gap and padding values across the page,
+  // snap to nearest 4px, keep values that appear at least twice.
+  const rawSpacing: number[] = [];
+  for (const node of nodes) {
+    for (const raw of [node.gap, node.paddingTop, node.paddingRight, node.paddingBottom, node.paddingLeft]) {
+      const n = normalizeLength(raw);
+      if (n !== null && n >= 2 && n <= 128) rawSpacing.push(Math.round(n / 4) * 4);
+    }
+  }
+  const spacingCounts = new Map<number, number>();
+  for (const v of rawSpacing) spacingCounts.set(v, (spacingCounts.get(v) ?? 0) + 1);
+  const spacingScale = [...spacingCounts.entries()]
+    .filter(([, count]) => count >= 2)
+    .map(([v]) => v)
+    .sort((a, b) => a - b);
+
+  // Content width: widest element that has an explicit max-width (not the viewport itself).
+  let contentWidth: number | undefined;
+  for (const node of nodes) {
+    if (node.maxWidth && node.maxWidth >= 320 && node.maxWidth <= 1920) {
+      if (!contentWidth || node.maxWidth > contentWidth) contentWidth = node.maxWidth;
+    }
+  }
+
+  // Page margin: horizontal padding on the body or main wrapper elements.
+  let pageMargin: number | undefined;
+  for (const node of nodes) {
+    const src = node.source.toLowerCase();
+    if (
+      src.startsWith("body") ||
+      src.startsWith("main") ||
+      /\b(wrapper|container|layout)\b/.test(src)
+    ) {
+      const left = normalizeLength(node.paddingLeft);
+      const right = normalizeLength(node.paddingRight);
+      if (left && right && left > 0 && Math.abs(left - right) <= 4) {
+        pageMargin = left;
+        break;
+      }
+    }
+  }
+
+  // Grid: find the CSS grid with the most columns.
+  let grid: LayoutMetrics["grid"] | undefined;
+  for (const node of nodes) {
+    if (node.display === "grid" && node.gridTemplateColumns) {
+      const columns = parseGridColumns(node.gridTemplateColumns);
+      const gap = normalizeLength(node.gap) ?? 0;
+      if (columns >= 2 && (!grid || columns > grid.columns)) {
+        grid = { columns, gap };
+      }
+    }
+  }
+
+  return { contentWidth, pageMargin, spacingScale, grid };
 }
 
 export function extractTokens(nodes: SerializedStyleNode[] = []): DesignTokens {
