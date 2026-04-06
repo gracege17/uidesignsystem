@@ -169,7 +169,22 @@ function captureSerializedStylesFromDocument() {
             width: parsePx(String(rect.width)),
             height: parsePx(String(rect.height)),
             display: style.display,
-            gap: parsePx(style.gap),
+            // If element has no gap, check its first flex/grid child — nav wrappers often delegate
+            // spacing to an inner <ul> or <div> that holds the actual items.
+            gap: (() => {
+                const selfGap = parsePx(style.gap);
+                if (selfGap)
+                    return selfGap;
+                const firstChild = element.children[0];
+                if (!firstChild)
+                    return undefined;
+                const childStyle = window.getComputedStyle(firstChild);
+                const childDisplay = childStyle.display;
+                if (childDisplay === "flex" || childDisplay === "inline-flex" || childDisplay === "grid") {
+                    return parsePx(childStyle.gap) ?? undefined;
+                }
+                return undefined;
+            })(),
             gridTemplateColumns: style.display === "grid" ? style.gridTemplateColumns : undefined,
             maxWidth: style.maxWidth !== "none" ? parsePx(style.maxWidth) : undefined,
             // Read padding from the element itself. If every side is zero, fall back to the first
