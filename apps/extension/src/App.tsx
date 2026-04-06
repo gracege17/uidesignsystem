@@ -200,7 +200,11 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
       score += 10;
     }
 
-    if (["input", "textarea", "select", "nav"].includes(tagName)) {
+    if (["input", "textarea", "select", "nav", "details"].includes(tagName)) {
+      score += 10;
+    }
+
+    if (element.hasAttribute("aria-expanded")) {
       score += 10;
     }
 
@@ -295,19 +299,21 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         width: parsePx(String(rect.width)),
         height: parsePx(String(rect.height)),
         display: style.display,
-        // If element has no gap, check its first flex/grid child — nav wrappers often delegate
-        // spacing to an inner <ul> or <div> that holds the actual items.
+        // If element has no gap, scan ALL direct children for a flex/grid container
+        // with a real gap. Nav wrappers often have logo in children[0] (gap:0) and
+        // the actual item list in a later sibling — first-child-only check misses it.
         gap: (() => {
           const selfGap = parsePx(style.gap);
           if (selfGap) return selfGap;
-          const firstChild = element.children[0] as HTMLElement | undefined;
-          if (!firstChild) return undefined;
-          const childStyle = window.getComputedStyle(firstChild);
-          const childDisplay = childStyle.display;
-          if (childDisplay === "flex" || childDisplay === "inline-flex" || childDisplay === "grid") {
-            return parsePx(childStyle.gap) ?? undefined;
+          let best = 0;
+          for (const child of Array.from(element.children).slice(0, 8)) {
+            const cs = window.getComputedStyle(child as HTMLElement);
+            if (cs.display === "flex" || cs.display === "inline-flex" || cs.display === "grid") {
+              const g = parsePx(cs.gap) ?? 0;
+              if (g > best) best = g;
+            }
           }
-          return undefined;
+          return best > 0 ? best : undefined;
         })(),
         gridTemplateColumns: style.display === "grid" ? style.gridTemplateColumns : undefined,
         maxWidth: style.maxWidth !== "none" ? parsePx(style.maxWidth) : undefined,
@@ -337,6 +343,7 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         flexWrap: style.flexWrap,
         borderRadius: parsePx(style.borderRadius),
         role: element.getAttribute("role") ?? undefined,
+        ariaExpanded: element.hasAttribute("aria-expanded") ? element.getAttribute("aria-expanded") === "true" : undefined,
         href: element instanceof HTMLAnchorElement ? element.href : undefined,
         inputType:
           element instanceof HTMLInputElement
