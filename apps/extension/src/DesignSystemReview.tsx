@@ -581,9 +581,8 @@ function ComponentsSection({
                 {realVariants.map(({ component }) => (
                   <div key={component.id} className="flex flex-col items-center gap-2">
                     <ComponentPreview component={component} tokens={result.tokens} theme={theme} showSpecs={false} />
-                    <p className={`text-[10px] capitalize ${ui.mutedText}`}>
-                      {component.variants.style}
-                    </p>
+                    <p className={`text-[10px] capitalize ${ui.mutedText}`}>{component.variants.style}</p>
+                    <p className={`max-w-[140px] truncate text-[9px] ${ui.mutedText} opacity-60`} title={component.source}>{component.source}</p>
                   </div>
                 ))}
               </div>
@@ -810,11 +809,105 @@ function ComponentPreview({
   }
 
   if (component.type === "Navigation") {
+    const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "8px";
+    const navBg = fill ?? (theme === "light" ? "#ffffff" : "#1e293b");
+    const navBorder = stroke ?? (theme === "light" ? "#e2e8f0" : "#334155");
+    const navText = getReadableTextColor(navBg, text, theme);
+    const pad = component.padding ?? component.autoLayout?.padding;
+
+    const specs: { label: string; value: string }[] = [];
+    if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+    if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
+    if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+
     return (
-      <div className="flex items-center gap-4 rounded-full border px-5 py-3 text-sm" style={style}>
-        <span>Overview</span>
-        <span className="opacity-60">Pricing</span>
-        <span className="opacity-60">Docs</span>
+      <div className="space-y-4">
+        <div
+          className="flex items-center gap-4 border px-5 py-3 text-sm"
+          style={{
+            backgroundColor: navBg,
+            borderColor: navBorder,
+            borderRadius,
+            color: navText,
+            fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
+            fontSize: type ? `${Math.min(type.fontSize, 18)}px` : undefined,
+            fontWeight: type?.fontWeight,
+          }}
+        >
+          <span>Overview</span>
+          <span style={{ opacity: 0.6 }}>Pricing</span>
+          <span style={{ opacity: 0.6 }}>Docs</span>
+        </div>
+        {showSpecs && specs.length > 0 && (
+          <div className="space-y-1.5">
+            {specs.map((spec) => (
+              <div key={spec.label} className="grid grid-cols-[64px_1fr] gap-3 text-xs">
+                <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
+                <span className={ui.bodyText}>{spec.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (component.type === "Accordion") {
+    const dividerColor = stroke ?? (theme === "light" ? "#e2e8f0" : "#334155");
+    const headingText = text ?? (theme === "light" ? "#0f172a" : "#f8fafc");
+    const bodyTextColor = theme === "light" ? "#475569" : "#94a3b8";
+    const specs: { label: string; value: string }[] = [];
+    if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+
+    return (
+      <div className="space-y-4">
+        <div style={{ fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined }}>
+          {/* collapsed row */}
+          <div
+            className="flex items-center justify-between py-4 text-sm"
+            style={{ borderBottom: `1px solid ${dividerColor}`, color: headingText, fontWeight: type?.fontWeight ?? 600 }}
+          >
+            <span>Payroll takes just a few clicks</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.5 }}>
+              <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          {/* expanded row */}
+          <div style={{ borderBottom: `1px solid ${dividerColor}` }}>
+            <div
+              className="flex items-center justify-between py-4 text-sm"
+              style={{ color: headingText, fontWeight: type?.fontWeight ?? 600 }}
+            >
+              <span>Sync hours with payroll</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M4 10l4-4 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <p className="pb-4 text-xs leading-relaxed" style={{ color: bodyTextColor }}>
+              Automatically calculates and syncs hours, PTO, and holidays with payroll.
+            </p>
+          </div>
+          {/* collapsed row */}
+          <div
+            className="flex items-center justify-between py-4 text-sm"
+            style={{ borderBottom: `1px solid ${dividerColor}`, color: headingText, fontWeight: type?.fontWeight ?? 600 }}
+          >
+            <span>Pay yourself compliantly</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.5 }}>
+              <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </div>
+        {showSpecs && specs.length > 0 && (
+          <div className="space-y-1.5">
+            {specs.map((spec) => (
+              <div key={spec.label} className="grid grid-cols-[64px_1fr] gap-3 text-xs">
+                <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
+                <span className={ui.bodyText}>{spec.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
