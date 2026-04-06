@@ -1285,10 +1285,15 @@ test("inferComponentType: element with ariaExpanded is classified as Accordion",
       source: "div.feature-trigger",
       tagName: "div",
       ariaExpanded: false,
+      textContent: "Payroll takes just a few clicks",
       childCount: 2,
       width: 720,
       height: 56,
       borderColor: "rgb(226, 232, 240)",
+      paddingTop: 16,
+      paddingRight: 20,
+      paddingBottom: 16,
+      paddingLeft: 20,
       fontFamily: "Inter, sans-serif",
       fontSize: 16,
       fontWeight: 600,
@@ -1325,10 +1330,14 @@ test("inferComponentType: element with ariaExpanded=true (open state) is also Ac
       tagName: "button",
       ariaExpanded: true,
       textContent: "Sync hours with payroll",
-      childCount: 1,
+      childCount: 2,
       width: 720,
       height: 56,
       borderColor: "rgb(226, 232, 240)",
+      paddingTop: 16,
+      paddingRight: 20,
+      paddingBottom: 16,
+      paddingLeft: 20,
       fontFamily: "Inter, sans-serif",
       fontSize: 16,
       fontWeight: 600,
@@ -1340,6 +1349,33 @@ test("inferComponentType: element with ariaExpanded=true (open state) is also Ac
   // ariaExpanded wins over the button tagName detection
   const accordions = result.components.filter((c) => c.type === "Accordion");
   assert.equal(accordions.length, 1, "button with ariaExpanded must be Accordion, not Button");
+});
+
+test("extractDesignSystem: menu-style aria-expanded triggers are not promoted to Accordion", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.radix-navigation-menu-trigger",
+      tagName: "button",
+      ariaExpanded: false,
+      textContent: "Product",
+      childCount: 2,
+      width: 132,
+      height: 40,
+      borderColor: "rgb(226, 232, 240)",
+      paddingTop: 8,
+      paddingRight: 12,
+      paddingBottom: 8,
+      paddingLeft: 12,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    }
+  ]);
+
+  const accordions = result.components.filter((component) => component.type === "Accordion");
+  assert.equal(accordions.length, 0, "menu-style aria-expanded triggers must not be extracted as Accordion");
 });
 
 test("inferComponentType: <a> with background but too many children is NOT a Button", () => {

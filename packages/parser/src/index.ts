@@ -407,12 +407,10 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     .join(" ")
     .toLowerCase();
 
-  // aria-expanded is a reliable accordion trigger signal — check it before button detection
-  // so that <button aria-expanded> is classified as Accordion, not Button.
   if (
     node.tagName === "details" ||
-    node.ariaExpanded !== undefined ||
-    /\b(accordion|disclosure|faq|expandable|collapsible)\b/.test(haystack)
+    /\b(accordion|disclosure|faq|expandable|collapsible)\b/.test(haystack) ||
+    isStrongAriaAccordionCandidate(node, haystack)
   ) {
     return "Accordion";
   }
@@ -515,13 +513,37 @@ function hasModalConfidence(node: SerializedStyleNode): boolean {
 function hasAccordionConfidence(node: SerializedStyleNode): boolean {
   const tagName = (node.tagName ?? "").toLowerCase();
   const source = buildComponentHaystack(node);
-  if (tagName === "details" || /\b(accordion|disclosure|faq|expandable|collapsible)\b/.test(source)) {
+  if (
+    tagName === "details" ||
+    /\b(accordion|disclosure|faq|expandable|collapsible)\b/.test(source)
+  ) {
     return true;
   }
 
+  return isStrongAriaAccordionCandidate(node, source);
+}
+
+function isStrongAriaAccordionCandidate(node: SerializedStyleNode, haystack: string): boolean {
+  if (node.ariaExpanded === undefined) {
+    return false;
+  }
+
+  if (/\b(nav|menu|dropdown|popover|tooltip|dialog|drawer|sheet|select|tabs?)\b/.test(haystack)) {
+    return false;
+  }
+
+  const text = (node.textContent ?? "").trim();
+  const width = node.width ?? 0;
+  const height = node.height ?? 0;
+
   return (
-    node.ariaExpanded !== undefined &&
-    (Boolean(node.borderColor) || (node.childCount ?? 0) >= 2)
+    text.length >= 12 &&
+    text.length <= 120 &&
+    width >= 240 &&
+    height >= 40 &&
+    height <= 120 &&
+    (node.childCount ?? 0) >= 2 &&
+    Boolean(node.borderColor || node.boxShadow || hasPadding(node))
   );
 }
 

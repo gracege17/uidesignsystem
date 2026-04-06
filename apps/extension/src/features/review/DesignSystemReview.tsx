@@ -984,6 +984,8 @@ function ComponentPreview({
     const headingText = text ?? (theme === "light" ? "#0f172a" : "#f8fafc");
     const bodyTextColor = theme === "light" ? "#475569" : "#94a3b8";
     const pad = component.padding ?? component.autoLayout?.padding;
+    const primaryLabel = component.textContent?.trim() || "Accordion item";
+    const supportingLabel = component.textContent?.trim() || "Expandable content";
     const specs: { label: string; value: string }[] = [];
     if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
     if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
@@ -1006,37 +1008,34 @@ function ComponentPreview({
               : {})
           }}
         >
-          {/* collapsed row */}
           <div
             className="flex items-center justify-between py-4 text-sm"
             style={{ borderBottom: `1px solid ${dividerColor}`, color: headingText, fontWeight: type?.fontWeight ?? 600 }}
           >
-            <span>Payroll takes just a few clicks</span>
+            <span>{primaryLabel}</span>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.5 }}>
               <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          {/* expanded row */}
           <div style={{ borderBottom: `1px solid ${dividerColor}` }}>
             <div
               className="flex items-center justify-between py-4 text-sm"
               style={{ color: headingText, fontWeight: type?.fontWeight ?? 600 }}
             >
-              <span>Sync hours with payroll</span>
+              <span>{supportingLabel}</span>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M4 10l4-4 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
             <p className="pb-4 text-xs leading-relaxed" style={{ color: bodyTextColor }}>
-              Automatically calculates and syncs hours, PTO, and holidays with payroll.
+              Expand to inspect the extracted interaction styling and layout treatment.
             </p>
           </div>
-          {/* collapsed row */}
           <div
             className="flex items-center justify-between py-4 text-sm"
             style={{ borderBottom: `1px solid ${dividerColor}`, color: headingText, fontWeight: type?.fontWeight ?? 600 }}
           >
-            <span>Pay yourself compliantly</span>
+            <span>{component.name.replace(/^accordion\//, "").replace(/-/g, " ")}</span>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.5 }}>
               <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
