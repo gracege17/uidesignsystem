@@ -165,10 +165,7 @@ function OverviewSection({
   const primaryFont = summary.fontFamilies[0];
   const bodyStyle = summary.body;
 
-  // Primary fill button
-  const primaryButton = result.components.find(
-    (c) => c.type === "Button" && c.variants.style === "fill" && c.variants.state === "default"
-  );
+  const primaryButton = pickPrimaryButton(result.components);
 
   // One-line summary sentence
   const summaryParts: string[] = [];
@@ -508,11 +505,7 @@ function ComponentsSection({
   const STYLE_PRIORITY: Record<string, number> = { fill: 0, outline: 1, ghost: 2 };
   const BUTTON_STYLES = ["fill", "outline", "ghost"] as const;
 
-  // Prefer default-state fill button as the base; fall back to any button
-  const baseButton =
-    result.components.find(
-      (c) => c.type === "Button" && c.variants.style === "fill" && c.variants.state === "default"
-    ) ?? result.components.find((c) => c.type === "Button");
+  const baseButton = pickPrimaryButton(result.components);
 
   // For each style, use a real extracted button if available; otherwise synthesize from base
   const buttonVariants: Array<{ component: ExtractedComponent; synthesized: boolean }> =
@@ -670,6 +663,48 @@ function ComponentsSection({
       </div>
     </div>
   );
+}
+
+function pickPrimaryButton(components: ExtractedComponent[]): ExtractedComponent | undefined {
+  const buttons = components.filter((component) => component.type === "Button");
+  if (buttons.length === 0) {
+    return undefined;
+  }
+
+  return [...buttons].sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left))[0];
+}
+
+function scorePrimaryButton(component: ExtractedComponent): number {
+  let score = 0;
+
+  if (component.variants.state === "default") {
+    score += 100;
+  }
+
+  if (component.variants.style === "fill") {
+    score += 80;
+  } else if (component.variants.style === "outline") {
+    score += 40;
+  }
+
+  if (component.variants.size === "lg") {
+    score += 40;
+  } else if (component.variants.size === "md") {
+    score += 20;
+  }
+
+  const padding = component.padding ?? component.autoLayout?.padding;
+  if (padding) {
+    score += padding.left + padding.right;
+    score += (padding.top + padding.bottom) * 0.5;
+  }
+
+  const label = component.textContent?.trim() ?? "";
+  if (label.length > 0) {
+    score += Math.min(label.length, 24);
+  }
+
+  return score;
 }
 
 function ComponentPreview({
