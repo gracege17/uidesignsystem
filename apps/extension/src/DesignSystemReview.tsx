@@ -27,7 +27,7 @@ export default function DesignSystemReview({
   const summary = useMemo(() => buildSummary(result), [result]);
 
   const copySection = async (key: ReviewTab | "everything") => {
-    const text = buildCopyText(key, summary);
+    const text = buildCopyText(key, summary, result.tokens);
     await navigator.clipboard.writeText(text);
     setCopiedKey(key);
     globalThis.setTimeout(() => {
@@ -77,10 +77,10 @@ export default function DesignSystemReview({
       <SectionShell title="Overview" subtitle="Key extracted foundations and primary signals." theme={theme} copyLabel="Copy Everything" copied={copiedKey === "everything"} onCopy={() => void copySection("everything")}>
         <OverviewSection summary={summary} theme={theme} />
       </SectionShell>
-      <SectionShell title="Color Styles" subtitle="Starter color styles extracted from the page." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void copySection("color")}>
+      <SectionShell title="Color Styles" subtitle="Colors extracted from the page, grouped by where they were found (fill, stroke, text)." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void copySection("color")}>
         <ColorSection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
-      <SectionShell title="Typography" subtitle="Likely display, heading, and body styles." theme={theme} copyLabel="Copy Typography" copied={copiedKey === "typography"} onCopy={() => void copySection("typography")}>
+      <SectionShell title="Typography" subtitle="Font families and text styles extracted from the page, ordered by size." theme={theme} copyLabel="Copy Typography" copied={copiedKey === "typography"} onCopy={() => void copySection("typography")}>
         <TypographySection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
       <SectionShell title="Spacing & Layout" subtitle="Content width, page margins, and spacing scale extracted from the page." theme={theme} copyLabel="Copy Layout" copied={copiedKey === "layout"} onCopy={() => void copySection("layout")}>
@@ -118,7 +118,7 @@ function SplitSection({
 
   if (tab === "color") {
     return (
-      <SectionShell title="Color Styles" subtitle="Grouped color styles with primary and supporting tokens." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void onCopy("color")}>
+      <SectionShell title="Color Styles" subtitle="Colors extracted from the page, grouped by where they were found (fill, stroke, text)." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void onCopy("color")}>
         <ColorSection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
     );
@@ -126,7 +126,7 @@ function SplitSection({
 
   if (tab === "typography") {
     return (
-      <SectionShell title="Typography" subtitle="Likely display, heading, and body specimens." theme={theme} copyLabel="Copy Typography" copied={copiedKey === "typography"} onCopy={() => void onCopy("typography")}>
+      <SectionShell title="Typography" subtitle="Font families and text styles extracted from the page, ordered by size." theme={theme} copyLabel="Copy Typography" copied={copiedKey === "typography"} onCopy={() => void onCopy("typography")}>
         <TypographySection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
     );
@@ -175,9 +175,9 @@ function OverviewSection({
         <div className={`p-6 ${ui.softPanel}`}>
           <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.mutedText}`}>Designer Questions</p>
           <div className={`mt-4 space-y-3 text-sm ${ui.bodyText}`}>
-            <p>Primary color: <span className={ui.strongText}>{summary.primaryColor?.value ?? "Unknown"}</span></p>
-            <p>H1 candidate: <span className={ui.strongText}>{summary.h1 ? `${summary.h1.fontFamily} ${summary.h1.fontSize}px / ${summary.h1.fontWeight}` : "Unknown"}</span></p>
-            <p>Body style: <span className={ui.strongText}>{summary.body ? `${summary.body.fontFamily} ${summary.body.fontSize}px / ${summary.body.fontWeight}` : "Unknown"}</span></p>
+            <p>Most common fill: <span className={ui.strongText}>{summary.primaryColor?.value ?? "Unknown"}</span></p>
+            <p>Largest text: <span className={ui.strongText}>{summary.h1 ? `${summary.h1.fontFamily} ${summary.h1.fontSize}px / ${summary.h1.fontWeight}` : "Unknown"}</span></p>
+            <p>Body range: <span className={ui.strongText}>{summary.body ? `${summary.body.fontFamily} ${summary.body.fontSize}px / ${summary.body.fontWeight}` : "Unknown"}</span></p>
             <p>Main component families: <span className={ui.strongText}>{summary.componentFamilies.slice(0, 3).map((family) => family.type).join(", ") || "Unknown"}</span></p>
           </div>
         </div>
@@ -250,12 +250,13 @@ function TypographySection({
 }) {
   const ui = getThemeClasses(theme);
   const seenIds = new Set<string>();
+  // Labels describe what we actually know — size position and range — not assumed semantic role
   const scale: Array<{ role: string; token: NonNullable<typeof summary.h1> }> = [
-    summary.h1 ? { role: "H1", token: summary.h1 } : null,
-    summary.h2 ? { role: "H2", token: summary.h2 } : null,
-    summary.h3 ? { role: "H3", token: summary.h3 } : null,
-    summary.body ? { role: "Body", token: summary.body } : null,
-    summary.caption ? { role: "Caption", token: summary.caption } : null,
+    summary.h1 ? { role: "Largest", token: summary.h1 } : null,
+    summary.h2 ? { role: "2nd Largest", token: summary.h2 } : null,
+    summary.h3 ? { role: "3rd Largest", token: summary.h3 } : null,
+    summary.body ? { role: "Body range (14–20px)", token: summary.body } : null,
+    summary.caption ? { role: "Small text (<14px)", token: summary.caption } : null,
   ].filter((entry): entry is NonNullable<typeof entry> => {
     if (!entry) return false;
     if (seenIds.has(entry.token.id)) return false;
@@ -370,23 +371,48 @@ function LayoutSection({
       )}
 
       {/* Spacing scale */}
-      {layout.spacingScale.length > 0 && (
-        <div className="space-y-3">
-          <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${ui.mutedText}`}>Spacing scale</p>
-          <div className="space-y-2">
-            {layout.spacingScale.map((value) => (
-              <div key={value} className="flex items-center gap-3">
-                <span className={`w-8 shrink-0 text-right text-[11px] tabular-nums ${ui.mutedText}`}>{value}</span>
-                <div
-                  className={`h-5 rounded ${ui.gridCell}`}
-                  style={{ width: `${Math.min(value * 2, 240)}px` }}
-                />
-                <span className={`text-[11px] ${ui.mutedText}`}>px</span>
-              </div>
-            ))}
+      {layout.spacingScale.length > 0 && (() => {
+        const scale = layout.spacingScale.slice(0, 8);
+        const baseUnit = scale[0];
+        const compact = scale.filter((v) => v <= 12);
+        const regular = scale.filter((v) => v > 12 && v <= 32);
+        const spacious = scale.filter((v) => v > 32);
+        const tiers = [
+          { label: "Compact", values: compact },
+          { label: "Regular", values: regular },
+          { label: "Spacious", values: spacious },
+        ].filter((t) => t.values.length > 0);
+
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${ui.mutedText}`}>Spacing scale</p>
+              <span className={`text-[11px] ${ui.mutedText}`}>Base unit: <span className={`font-semibold ${ui.bodyText}`}>{baseUnit}px</span></span>
+            </div>
+            <div className="grid grid-cols-3 gap-6">
+              {tiers.map((tier) => {
+                const max = tier.values[tier.values.length - 1];
+                return (
+                  <div key={tier.label} className="space-y-3">
+                    <p className={`text-[10px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{tier.label}</p>
+                    <div className="space-y-2">
+                      {tier.values.map((value) => (
+                        <div key={value} className="space-y-1">
+                          <div
+                            className={`h-5 rounded ${ui.gridCell}`}
+                            style={{ width: `${Math.round((value / max) * 100)}%` }}
+                          />
+                          <span className={`text-[11px] tabular-nums ${ui.mutedText}`}>{value}px</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {!hasAnything && <EmptyState message="No spacing or layout data could be extracted from this page." theme={theme} />}
     </div>
@@ -457,8 +483,10 @@ function ComponentsSection({
       <div className="grid gap-6 md:grid-cols-2">
 
       {buttonVariants.length > 0 && (() => {
-        const fillEntry = buttonVariants.find((v) => v.component.variants.style === "fill");
-        const fillComponent = fillEntry?.component ?? buttonVariants[0].component;
+        const realVariants = buttonVariants.filter((v) => !v.synthesized);
+        if (realVariants.length === 0) return null;
+        const fillEntry = realVariants.find((v) => v.component.variants.style === "fill");
+        const fillComponent = fillEntry?.component ?? realVariants[0].component;
         const fillType = result.tokens.typography.find((t) => fillComponent.tokens.typography.includes(t.id));
         const fillPad = fillComponent.padding ?? fillComponent.autoLayout?.padding;
         const specs: { label: string; value: string }[] = [];
@@ -470,15 +498,15 @@ function ComponentsSection({
           <div className={`${ui.softPanel} p-5 md:col-span-2`}>
             <div className="flex items-start justify-between gap-3">
               <p className={`text-sm font-semibold ${ui.headingText}`}>Button</p>
-              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>3 variants</span>
+              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{realVariants.length} {realVariants.length === 1 ? "variant found" : "variants found"}</span>
             </div>
             <div className={`mt-4 p-4 ${ui.previewPanel} space-y-5`}>
               <div className="flex flex-wrap items-center gap-8">
-                {buttonVariants.map(({ component, synthesized }) => (
+                {realVariants.map(({ component }) => (
                   <div key={component.id} className="flex flex-col items-center gap-2">
                     <ComponentPreview component={component} tokens={result.tokens} theme={theme} showSpecs={false} />
                     <p className={`text-[10px] capitalize ${ui.mutedText}`}>
-                      {component.variants.style}{synthesized ? " *" : ""}
+                      {component.variants.style}
                     </p>
                   </div>
                 ))}
@@ -985,10 +1013,10 @@ function getThemeClasses(theme: ThemeMode) {
   };
 }
 
-function buildCopyText(key: ReviewTab | "everything", summary: SummaryModel) {
+function buildCopyText(key: ReviewTab | "everything", summary: SummaryModel, tokens: DesignTokens) {
   const sections = {
     overview: buildOverviewCopy(summary),
-    color: buildColorCopy(summary),
+    color: buildColorCopy(tokens),
     typography: buildTypographyCopy(summary),
     layout: buildLayoutCopy(summary),
     components: buildComponentsCopy(summary)
@@ -1016,20 +1044,23 @@ function buildCopyText(key: ReviewTab | "everything", summary: SummaryModel) {
 function buildOverviewCopy(summary: SummaryModel) {
   return [
     "Overview",
-    `- Primary color: ${summary.primaryColor?.value ?? "Unknown"}`,
+    `- Most common fill: ${summary.primaryColor?.value ?? "Unknown"}`,
     `- Typefaces: ${summary.fontFamilies.length > 0 ? summary.fontFamilies.join(", ") : "Unknown"}`,
-    `- H1 candidate: ${summary.h1 ? `${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / ${summary.h1.fontWeight}` : "Unknown"}`,
-    `- Body style: ${summary.body ? `${summary.body.fontSize}px / ${summary.body.lineHeight}px / ${summary.body.fontWeight}` : "Unknown"}`,
+    `- Largest text: ${summary.h1 ? `${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / ${summary.h1.fontWeight}` : "Unknown"}`,
+    `- Body range: ${summary.body ? `${summary.body.fontSize}px / ${summary.body.lineHeight}px / ${summary.body.fontWeight}` : "Unknown"}`,
     `- Main component families: ${summary.componentFamilies.slice(0, 3).map((family) => family.type).join(", ") || "Unknown"}`
   ].join("\n");
 }
 
-function buildColorCopy(summary: SummaryModel) {
+function buildColorCopy(tokens: DesignTokens) {
+  const fills = tokens.colors.filter((t) => t.role === "fill");
+  const strokes = tokens.colors.filter((t) => t.role === "stroke");
+  const texts = tokens.colors.filter((t) => t.role === "text");
   return [
     "Color",
-    ...summary.colorGroups.primary.map((token) => `- Primary: ${token.name} = ${token.value}`),
-    ...summary.colorGroups.neutral.map((token) => `- Neutral: ${token.name} = ${token.value}`),
-    ...summary.colorGroups.accent.map((token) => `- Accent: ${token.name} = ${token.value}`)
+    ...fills.map((token) => `- Fill: ${token.value} (${token.source})`),
+    ...strokes.map((token) => `- Stroke: ${token.value} (${token.source})`),
+    ...texts.map((token) => `- Text: ${token.value} (${token.source})`)
   ].join("\n");
 }
 
@@ -1039,11 +1070,11 @@ function buildTypographyCopy(summary: SummaryModel) {
     lines.push(`- Typefaces: ${summary.fontFamilies.join(", ")}`);
     lines.push(`  Note: The preview above uses a system fallback font, not the actual typeface. Source ${summary.fontFamilies.join(", ")} separately to match the original.`);
   }
-  if (summary.h1) lines.push(`- H1: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight} / ls ${summary.h1.letterSpacing}px`);
-  if (summary.h2) lines.push(`- H2: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight} / ls ${summary.h2.letterSpacing}px`);
-  if (summary.h3) lines.push(`- H3: ${summary.h3.fontSize}px / ${summary.h3.lineHeight}px / weight ${summary.h3.fontWeight} / ls ${summary.h3.letterSpacing}px`);
-  if (summary.body) lines.push(`- Body: ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight} / ls ${summary.body.letterSpacing}px`);
-  if (summary.caption) lines.push(`- Caption: ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight} / ls ${summary.caption.letterSpacing}px`);
+  if (summary.h1) lines.push(`- Largest: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight} / ls ${summary.h1.letterSpacing}px`);
+  if (summary.h2) lines.push(`- 2nd Largest: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight} / ls ${summary.h2.letterSpacing}px`);
+  if (summary.h3) lines.push(`- 3rd Largest: ${summary.h3.fontSize}px / ${summary.h3.lineHeight}px / weight ${summary.h3.fontWeight} / ls ${summary.h3.letterSpacing}px`);
+  if (summary.body) lines.push(`- Body range (14-20px): ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight} / ls ${summary.body.letterSpacing}px`);
+  if (summary.caption) lines.push(`- Small text (<14px): ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight} / ls ${summary.caption.letterSpacing}px`);
   return lines.join("\n");
 }
 
