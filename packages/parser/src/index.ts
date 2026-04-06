@@ -379,10 +379,19 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     .join(" ")
     .toLowerCase();
 
+  // <a> tags are only buttons when they look like one: small, few children, non-empty label.
+  // A bare "has background" check catches nav links, hero banners, card wrappers — all noise.
+  const isButtonLikeAnchor =
+    node.tagName === "a" &&
+    Boolean(node.backgroundColor) &&
+    (node.height ?? 999) <= 80 &&
+    (node.childCount ?? 999) <= 3 &&
+    Boolean((node.textContent ?? "").trim());
+
   if (
     node.tagName === "button" ||
     /\b(btn|button|cta)\b/.test(haystack) ||
-    (node.tagName === "a" && Boolean(node.backgroundColor))
+    isButtonLikeAnchor
   ) {
     // Reject if the text looks like informational content, not an action label.
     // Real button labels are short, have no commas, and don't contain digits like IDs.
@@ -410,9 +419,12 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
 
   if (
     /\b(card|panel|tile)\b/.test(haystack) ||
-    (Boolean(node.boxShadow || node.backgroundColor || node.borderColor) &&
-      (node.childCount ?? 0) >= 1 &&
-      (node.height ?? 0) >= 48)
+    // Structural card signal: needs explicit containment (shadow OR border) PLUS
+    // meaningful children AND a card-like aspect ratio (wider than tall, not a full-width strip).
+    (Boolean(node.boxShadow || node.borderColor) &&
+      (node.childCount ?? 0) >= 2 &&
+      (node.height ?? 0) >= 80 &&
+      (node.width ?? 0) < 900)
   ) {
     return "Card";
   }

@@ -475,6 +475,6 @@ function buildLayoutCopy(_summary) {
 function buildComponentsCopy(summary) {
     return [
         "Components",
-        ...summary.componentFamilies.slice(0, 6).map((family) => `- ${family.type}: ${family.count} repeated instances`)
+        ...summary.componentFamilies.slice(0, 6).map((family) => `- ${family.type}: ${family.count} detected variant${family.count !== 1 ? "s" : ""}`)
     ].join("\n");
 }

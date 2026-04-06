@@ -400,3 +400,298 @@ test("extractDesignSystem: result includes layout field", () => {
   assert.equal(result.layout.contentWidth, 1280, "content width must match real maxWidth");
   assert.equal(result.layout.grid?.columns, 3, "grid columns must come from gridTemplateColumns");
 });
+
+// ─── Card component detection ────────────────────────────────────────────────
+
+test("extractDesignSystem: no Card component when page has no card-like elements", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.primary",
+      tagName: "button",
+      textContent: "Sign up",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      width: 160,
+      height: 48,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    },
+    {
+      source: "button.secondary",
+      tagName: "button",
+      textContent: "Learn more",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      width: 160,
+      height: 48,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const cardComponents = result.components.filter((c) => c.type === "Card");
+  assert.equal(cardComponents.length, 0, "no Card should be extracted when page has only buttons");
+});
+
+test("extractDesignSystem: a single card-like element is not extracted (needs 2+ instances)", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.primary",
+      tagName: "button",
+      textContent: "Sign up",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      height: 48,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    },
+    {
+      source: "button.secondary",
+      tagName: "button",
+      textContent: "Learn more",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      height: 48,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    },
+    // Only one card — should be filtered out by shouldKeepComponentCandidate
+    {
+      source: "section.card.hero",
+      tagName: "section",
+      classNames: ["card", "hero"],
+      childCount: 3,
+      width: 320,
+      height: 220,
+      display: "flex",
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)"
+    }
+  ]);
+
+  const cardComponents = result.components.filter((c) => c.type === "Card");
+  assert.equal(cardComponents.length, 0, "a single card instance must be filtered out");
+});
+
+test("extractDesignSystem: two card elements produce exactly one Card component", () => {
+  const result = extractDesignSystem([
+    {
+      source: "section.card.product",
+      tagName: "section",
+      classNames: ["card", "product"],
+      childCount: 3,
+      width: 320,
+      height: 220,
+      display: "flex",
+      paddingTop: 24,
+      paddingRight: 24,
+      paddingBottom: 24,
+      paddingLeft: 24,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      borderRadius: 16
+    },
+    {
+      source: "section.card.pricing",
+      tagName: "section",
+      classNames: ["card", "pricing"],
+      childCount: 3,
+      width: 320,
+      height: 220,
+      display: "flex",
+      paddingTop: 24,
+      paddingRight: 24,
+      paddingBottom: 24,
+      paddingLeft: 24,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      borderRadius: 16
+    }
+  ]);
+
+  const cardComponents = result.components.filter((c) => c.type === "Card");
+  assert.equal(cardComponents.length, 1, "two matching card instances should produce one Card component");
+});
+
+test("extractDesignSystem: Card captures cornerRadius and padding", () => {
+  const result = extractDesignSystem([
+    {
+      source: "section.card.one",
+      tagName: "section",
+      classNames: ["card"],
+      childCount: 2,
+      width: 320,
+      height: 200,
+      display: "flex",
+      paddingTop: 20,
+      paddingRight: 24,
+      paddingBottom: 20,
+      paddingLeft: 24,
+      borderRadius: 12,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)"
+    },
+    {
+      source: "section.card.two",
+      tagName: "section",
+      classNames: ["card"],
+      childCount: 2,
+      width: 320,
+      height: 200,
+      display: "flex",
+      paddingTop: 20,
+      paddingRight: 24,
+      paddingBottom: 20,
+      paddingLeft: 24,
+      borderRadius: 12,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)"
+    }
+  ]);
+
+  const card = result.components.find((c) => c.type === "Card");
+  assert.ok(card, "Card must be detected");
+  assert.equal(card.cornerRadius, 12, "cornerRadius must be captured from DOM");
+
+  const pad = card.padding ?? card.autoLayout?.padding;
+  assert.ok(pad, "padding must be captured");
+  assert.equal(pad.top, 20);
+  assert.equal(pad.right, 24);
+  assert.equal(pad.bottom, 20);
+  assert.equal(pad.left, 24);
+});
+
+test("extractDesignSystem: Card with box shadow maps effect token", () => {
+  const result = extractDesignSystem([
+    {
+      source: "div.card.a",
+      tagName: "div",
+      classNames: ["card"],
+      childCount: 2,
+      width: 300,
+      height: 200,
+      backgroundColor: "rgb(255, 255, 255)",
+      boxShadow: "0px 4px 16px rgba(0, 0, 0, 0.12)"
+    },
+    {
+      source: "div.card.b",
+      tagName: "div",
+      classNames: ["card"],
+      childCount: 2,
+      width: 300,
+      height: 200,
+      backgroundColor: "rgb(255, 255, 255)",
+      boxShadow: "0px 4px 16px rgba(0, 0, 0, 0.12)"
+    }
+  ]);
+
+  const card = result.components.find((c) => c.type === "Card");
+  assert.ok(card, "Card must be detected");
+  assert.ok(card.tokens.effects.length > 0, "Card must reference the shadow effect token");
+
+  const effectToken = result.tokens.effects.find((e) => card.tokens.effects.includes(e.id));
+  assert.ok(effectToken, "effect token must exist in tokens list");
+  assert.equal(effectToken.style, "drop-shadow");
+});
+
+// ─── Button <a> detection ────────────────────────────────────────────────────
+
+test("inferComponentType: small <a> with background and short text is a Button", () => {
+  const result = extractDesignSystem([
+    {
+      source: "a.btn-primary",
+      tagName: "a",
+      href: "https://example.com/signup",
+      textContent: "Get started",
+      childCount: 1,
+      width: 140,
+      height: 44,
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    },
+    {
+      source: "a.btn-secondary",
+      tagName: "a",
+      href: "https://example.com/demo",
+      textContent: "Book a demo",
+      childCount: 1,
+      width: 140,
+      height: 44,
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const buttons = result.components.filter((c) => c.type === "Button");
+  assert.ok(buttons.length > 0, "small <a> with short label should be a Button");
+});
+
+test("inferComponentType: tall <a> (hero banner) is NOT a Button", () => {
+  const result = extractDesignSystem([
+    {
+      source: "a.HeroBanner",
+      tagName: "a",
+      href: "https://example.com/product",
+      textContent: "Explore our product suite",
+      childCount: 5,
+      width: 1200,
+      height: 400,
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const buttons = result.components.filter((c) => c.type === "Button");
+  assert.equal(buttons.length, 0, "tall/wide <a> hero banner must not be classified as a Button");
+});
+
+test("inferComponentType: <a> with background but too many children is NOT a Button", () => {
+  const result = extractDesignSystem([
+    {
+      source: "a.NavCard",
+      tagName: "a",
+      href: "https://example.com/features",
+      textContent: "Features overview heading with description",
+      childCount: 6,
+      width: 320,
+      height: 200,
+      backgroundColor: "rgb(255, 255, 255)",
+      textColor: "rgb(15, 23, 42)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 400,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const buttons = result.components.filter((c) => c.type === "Button");
+  assert.equal(buttons.length, 0, "<a> with many children must not be a Button");
+});
