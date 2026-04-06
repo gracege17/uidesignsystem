@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DesignTokens, ExtractedComponent, ExtractionResult, LayoutMetrics } from "@extractor/types";
 
 const REVIEW_TABS = [
@@ -311,6 +311,38 @@ function TypographySection({
   theme: ThemeMode;
 }) {
   const ui = getThemeClasses(theme);
+
+  useEffect(() => {
+    const defs = summary.fontFamilies
+      .map((family) => getOpenSourceFontDefinition(family))
+      .filter((definition): definition is OpenSourceFontDefinition => Boolean(definition));
+
+    if (defs.length === 0) {
+      return;
+    }
+
+    const inserted: HTMLLinkElement[] = [];
+    for (const definition of defs) {
+      const id = `open-font-${definition.id}`;
+      if (document.getElementById(id)) {
+        continue;
+      }
+
+      const link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      link.href = definition.url;
+      document.head.appendChild(link);
+      inserted.push(link);
+    }
+
+    return () => {
+      for (const link of inserted) {
+        link.remove();
+      }
+    };
+  }, [summary.fontFamilies]);
+
   const seenIds = new Set<string>();
   // Labels describe what we actually know — size position and range — not assumed semantic role
   const scale: Array<{ role: string; token: NonNullable<typeof summary.h1> }> = [
@@ -339,7 +371,7 @@ function TypographySection({
             <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>Typeface</p>
             <p className={`mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`}>{family}</p>
             <p className={`mt-2 text-[11px] ${ui.heroMetaText}`}>
-              Preview uses a system fallback — not the actual font. To use <span className="italic">{family}</span>, source it separately.
+              {buildFontPreviewStatus(family).message}
             </p>
           </div>
         ))}
@@ -358,6 +390,7 @@ function TypographySection({
               <p
                 className={`pr-6 ${ui.headingText}`}
                 style={{
+                  fontFamily: buildPreviewFontStack(token.fontFamily),
                   fontSize: `${Math.min(token.fontSize, 64)}px`,
                   lineHeight: `${Math.min(token.lineHeight, 72)}px`,
                   fontWeight: token.fontWeight,
@@ -1381,7 +1414,10 @@ function buildTypographyCopy(summary: SummaryModel) {
   const lines = ["Typography"];
   if (summary.fontFamilies.length > 0) {
     lines.push(`- Typefaces: ${summary.fontFamilies.join(", ")}`);
-    lines.push(`  Note: The preview above uses a system fallback font, not the actual typeface. Source ${summary.fontFamilies.join(", ")} separately to match the original.`);
+    for (const family of summary.fontFamilies) {
+      const status = buildFontPreviewStatus(family);
+      lines.push(`  - ${family}: ${status.copyLabel}`);
+    }
   }
   if (summary.h1) lines.push(`- Largest: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight} / ls ${summary.h1.letterSpacing}px`);
   if (summary.h2) lines.push(`- 2nd Largest: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight} / ls ${summary.h2.letterSpacing}px`);
@@ -1389,6 +1425,83 @@ function buildTypographyCopy(summary: SummaryModel) {
   if (summary.body) lines.push(`- Body range (14-20px): ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight} / ls ${summary.body.letterSpacing}px`);
   if (summary.caption) lines.push(`- Small text (<14px): ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight} / ls ${summary.caption.letterSpacing}px`);
   return lines.join("\n");
+}
+
+interface OpenSourceFontDefinition {
+  id: string;
+  family: string;
+  url: string;
+}
+
+const OPEN_SOURCE_FONT_REGISTRY: Record<string, OpenSourceFontDefinition> = {
+  inter: {
+    id: "inter",
+    family: "Inter",
+    url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+  },
+  sora: {
+    id: "sora",
+    family: "Sora",
+    url: "https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap"
+  },
+  "ibm plex sans": {
+    id: "ibm-plex-sans",
+    family: "IBM Plex Sans",
+    url: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+  },
+  "ibm plex serif": {
+    id: "ibm-plex-serif",
+    family: "IBM Plex Serif",
+    url: "https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600;700&display=swap"
+  },
+  "ibm plex mono": {
+    id: "ibm-plex-mono",
+    family: "IBM Plex Mono",
+    url: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap"
+  }
+};
+
+function buildTypographyPreviewNote(family: string): string {
+  return buildFontPreviewStatus(family).message;
+}
+
+function buildFontPreviewStatus(family: string): { message: string; copyLabel: string } {
+  const definition = getOpenSourceFontDefinition(family);
+  if (definition) {
+    return {
+      message: `${definition.family} is open source. This preview uses the actual font when it is available here.`,
+      copyLabel: "open-source font, preview uses the real typeface when available"
+    };
+  }
+
+  return {
+    message: `The typography shown here is not the site's actual font. ${family} is not verified open-source in this preview, so a fallback is used.`,
+    copyLabel: "not verified open-source, preview is fallback only"
+  };
+}
+
+function buildPreviewFontStack(family: string): string | undefined {
+  const definition = getOpenSourceFontDefinition(family);
+  if (!definition) {
+    return undefined;
+  }
+
+  return `"${definition.family}", "${family}", sans-serif`;
+}
+
+function getOpenSourceFontDefinition(family: string): OpenSourceFontDefinition | undefined {
+  const normalized = normalizeFontLookupKey(family);
+  return OPEN_SOURCE_FONT_REGISTRY[normalized];
+}
+
+function normalizeFontLookupKey(family: string): string {
+  return family
+    .split(",")[0]
+    .replace(/['"]/g, "")
+    .replace(/\bvariable\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function buildLayoutCopy(_summary: SummaryModel) {
