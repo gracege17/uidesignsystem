@@ -273,12 +273,7 @@ export function extractComponents(
 
   return candidates.map((candidate, index) => {
     const variants = inferComponentVariants(candidate.node);
-    const semanticStem = inferSemanticStem([candidate.node.source], "component");
-    const name = makeUniqueName(
-      `${candidate.type.toLowerCase()}/${semanticStem ?? candidate.type.toLowerCase()}`,
-      usedNames,
-      index + 1
-    );
+    const name = inferComponentName(candidate, usedNames, index + 1);
 
     return {
       id: `component-${String(index + 1).padStart(3, "0")}`,
@@ -299,6 +294,25 @@ export function extractComponents(
       textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })()
     };
   });
+}
+
+function inferComponentName(
+  candidate: ComponentCandidate,
+  usedNames: Set<string>,
+  index: number
+): string {
+  const typeStem = candidate.type.toLowerCase();
+  const semanticStem = inferSemanticStem([candidate.node.source], "component");
+
+  if (candidate.type === "Navigation") {
+    return makeUniqueName(`${typeStem}/top-nav`, usedNames, index);
+  }
+
+  return makeUniqueName(
+    `${typeStem}/${semanticStem ?? typeStem}`,
+    usedNames,
+    index
+  );
 }
 
 function collectComponentCandidates(nodes: SerializedStyleNode[]): ComponentCandidate[] {
@@ -1151,6 +1165,7 @@ function tokenizeSource(source: string): string[] {
     .split(/[^a-zA-Z0-9]+/)
     .map((part) => part.trim().toLowerCase())
     .filter((part) => part.length > 1 && !/^\d+$/.test(part))
+    .filter((part) => !/^(?:[a-f0-9]{8,}|[a-z0-9]{12,})$/i.test(part))
     .filter((part) => !GENERIC_SOURCE_TERMS.has(part));
 }
 

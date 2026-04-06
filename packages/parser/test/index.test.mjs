@@ -1071,6 +1071,32 @@ test("extractDesignSystem: Navigation captures cornerRadius and padding", () => 
   assert.equal(pad.left, 24);
 });
 
+test("extractDesignSystem: Navigation uses a stable top-nav name instead of hashed source text", () => {
+  const result = extractDesignSystem([
+    {
+      source: "navigation/7418f11d",
+      tagName: "nav",
+      childCount: 4,
+      width: 1180,
+      height: 72,
+      display: "flex",
+      paddingTop: 16,
+      paddingRight: 24,
+      paddingBottom: 16,
+      paddingLeft: 24,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    }
+  ]);
+
+  const nav = result.components.find((component) => component.type === "Navigation");
+  assert.ok(nav, "Navigation must be detected");
+  assert.equal(nav.name, "navigation/top-nav");
+});
+
 test("extractDesignSystem: Navigation maps fill and stroke color tokens", () => {
   const result = extractDesignSystem([
     {

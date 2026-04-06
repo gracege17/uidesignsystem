@@ -658,23 +658,24 @@ function ComponentsSection({
         );
       })()}
 
-      {otherCurated.map((component) => (
+      {otherCurated.map((component) => {
+        const meta = getComponentDisplayMeta(component);
+        return (
         <div key={component.id} className={`${ui.softPanel} p-5`}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className={`text-sm font-semibold ${ui.headingText}`}>{component.type}</p>
-              <p className={`mt-1 text-xs ${ui.bodyText}`}>
-                {component.variants.style} · {component.variants.size} · {component.variants.state}
-              </p>
+              <p className={`text-sm font-semibold ${ui.headingText}`}>{meta.title}</p>
+              <p className={`mt-1 text-xs ${ui.bodyText}`}>{meta.subtitle}</p>
             </div>
-            <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{component.name}</span>
+            <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{meta.badge}</span>
           </div>
 
           <div className={`mt-4 p-4 ${ui.previewPanel}`}>
             <ComponentPreview component={component} tokens={result.tokens} theme={theme} />
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {visibleHeroButtons.length === 0 && !baseCard && otherCurated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
       </div>
@@ -763,6 +764,26 @@ function scorePrimaryButton(component: ExtractedComponent): number {
   }
 
   return score;
+}
+
+function getComponentDisplayMeta(component: ExtractedComponent): {
+  title: string;
+  subtitle: string;
+  badge: string;
+} {
+  if (component.type === "Navigation") {
+    return {
+      title: "Top Nav",
+      subtitle: "Top nav item",
+      badge: "top nav"
+    };
+  }
+
+  return {
+    title: component.type,
+    subtitle: `${component.variants.style} · ${component.variants.size} · ${component.variants.state}`,
+    badge: component.name
+  };
 }
 
 function ComponentPreview({
