@@ -359,11 +359,22 @@ function LayoutSection({
           <div className={`${ui.softPanel} p-4 space-y-3`}>
             <div className={`flex items-center justify-between text-sm ${ui.bodyText}`}>
               <span>{layout.grid.columns} columns</span>
-              <span>gap {layout.grid.gap}px</span>
+              <span className="flex items-center gap-1.5">
+                {layout.grid.gap > 0
+                  ? `gap ${layout.grid.gap}px`
+                  : <span>gap <span className={`italic ${ui.mutedText}`}>via cell padding</span></span>
+                }
+              </span>
             </div>
-            <div className="flex gap-1.5">
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: `repeat(${Math.min(layout.grid.columns, 12)}, minmax(0, 1fr))`,
+                gap: layout.grid.gap > 0 ? `${layout.grid.gap}px` : "0px"
+              }}
+            >
               {Array.from({ length: Math.min(layout.grid.columns, 12) }).map((_, i) => (
-                <div key={i} className={`h-8 flex-1 rounded ${ui.gridCell}`} />
+                <div key={i} className={`h-8 rounded ${ui.gridCell}`} />
               ))}
             </div>
           </div>
