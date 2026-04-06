@@ -207,9 +207,9 @@ function ColorSection({
 }) {
   const ui = getThemeClasses(theme);
   const groups = [
-    { label: "Primary", items: summary.colorGroups.primary },
-    { label: "Neutral", items: summary.colorGroups.neutral },
-    { label: "Accent", items: summary.colorGroups.accent }
+    { label: "Fill", items: tokens.colors.filter((t) => t.role === "fill") },
+    { label: "Stroke", items: tokens.colors.filter((t) => t.role === "stroke") },
+    { label: "Text", items: tokens.colors.filter((t) => t.role === "text") }
   ].filter((group) => group.items.length > 0);
 
   return (
@@ -373,14 +373,15 @@ function LayoutSection({
       {layout.spacingScale.length > 0 && (
         <div className="space-y-3">
           <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${ui.mutedText}`}>Spacing scale</p>
-          <div className="flex flex-wrap gap-3">
+          <div className="space-y-2">
             {layout.spacingScale.map((value) => (
-              <div key={value} className="flex flex-col items-center gap-2">
+              <div key={value} className="flex items-center gap-3">
+                <span className={`w-8 shrink-0 text-right text-[11px] tabular-nums ${ui.mutedText}`}>{value}</span>
                 <div
-                  className={`${ui.gridCell} rounded`}
-                  style={{ width: `${Math.min(value, 80)}px`, height: `${Math.min(value, 80)}px` }}
+                  className={`h-5 rounded ${ui.gridCell}`}
+                  style={{ width: `${Math.min(value * 2, 240)}px` }}
                 />
-                <span className={`text-[11px] tabular-nums ${ui.mutedText}`}>{value}</span>
+                <span className={`text-[11px] ${ui.mutedText}`}>px</span>
               </div>
             ))}
           </div>
@@ -433,9 +434,14 @@ function ComponentsSection({
         })
       : [];
 
-  // For non-Button families, pick the best fill representative
+  // Pick the best Card representative (fill > outline > ghost)
+  const baseCard =
+    result.components.find((c) => c.type === "Card" && c.variants.style === "fill") ??
+    result.components.find((c) => c.type === "Card");
+
+  // For non-Button, non-Card families, pick the best fill representative
   const otherCurated = summary.componentFamilies
-    .filter((family) => family.type !== "Button")
+    .filter((family) => family.type !== "Button" && family.type !== "Card")
     .map((family) => {
       const matches = result.components.filter((c) => c.type === family.type);
       return matches.sort(
@@ -492,6 +498,54 @@ function ComponentsSection({
         );
       })()}
 
+      {!baseCard && (buttonVariants.length > 0 || otherCurated.length > 0) && (
+        <div className={`${ui.softPanel} p-5 md:col-span-2 opacity-50`}>
+          <div className="flex items-start justify-between gap-3">
+            <p className={`text-sm font-semibold ${ui.headingText}`}>Card</p>
+            <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>not detected</span>
+          </div>
+          <div className={`mt-4 p-4 ${ui.previewPanel}`}>
+            <div className="flex h-28 items-center justify-center rounded-xl border-2 border-dashed" style={{ borderColor: "currentColor" }}>
+              <p className={`text-xs ${ui.mutedText}`}>No card pattern found on this page</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {baseCard && (() => {
+        const cardType = result.tokens.typography.find((t) => baseCard.tokens.typography.includes(t.id));
+        const cardPad = baseCard.padding ?? baseCard.autoLayout?.padding;
+        const cardSpecs: { label: string; value: string }[] = [];
+        if (cardType) cardSpecs.push({ label: "Font", value: `${cardType.fontFamily} · ${cardType.fontSize}px · ${cardType.fontWeight}` });
+        if (cardPad) cardSpecs.push({ label: "Padding", value: `${cardPad.top} · ${cardPad.right} · ${cardPad.bottom} · ${cardPad.left} px` });
+        if (baseCard.cornerRadius !== undefined) cardSpecs.push({ label: "Corner", value: `${baseCard.cornerRadius}px` });
+        cardSpecs.push({ label: "Size", value: baseCard.variants.size });
+        const cardCount = result.components.filter((c) => c.type === "Card").length;
+        return (
+          <div className={`${ui.softPanel} p-5 md:col-span-2`}>
+            <div className="flex items-start justify-between gap-3">
+              <p className={`text-sm font-semibold ${ui.headingText}`}>Card</p>
+              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{cardCount} {cardCount === 1 ? "instance" : "instances"}</span>
+            </div>
+            <div className={`mt-4 p-4 ${ui.previewPanel} space-y-5`}>
+              <div className="max-w-[220px]">
+                <ComponentPreview component={baseCard} tokens={result.tokens} theme={theme} showSpecs={false} />
+              </div>
+              {cardSpecs.length > 0 && (
+                <div className={`border-t pt-4 ${ui.rule} grid grid-cols-2 gap-x-8 gap-y-1.5`}>
+                  {cardSpecs.map((spec) => (
+                    <div key={spec.label} className="grid grid-cols-[64px_1fr] gap-3 text-xs">
+                      <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
+                      <span className={ui.bodyText}>{spec.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {otherCurated.map((component) => (
         <div key={component.id} className={`${ui.softPanel} p-5`}>
           <div className="flex items-start justify-between gap-3">
@@ -510,7 +564,7 @@ function ComponentsSection({
         </div>
       ))}
 
-      {buttonVariants.length === 0 && otherCurated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
+      {buttonVariants.length === 0 && !baseCard && otherCurated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
       </div>
     </div>
   );
@@ -594,6 +648,58 @@ function ComponentPreview({
           <div className="space-y-1.5">
             {specs.map((spec) => (
               <div key={spec.label} className="grid grid-cols-[56px_1fr] gap-3 text-xs">
+                <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
+                <span className={ui.bodyText}>{spec.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (component.type === "Card") {
+    const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "16px";
+    const pad = component.padding ?? component.autoLayout?.padding;
+    const specs: { label: string; value: string }[] = [];
+    if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+    if (pad) specs.push({ label: "Padding", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
+    if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+    specs.push({ label: "Size", value: component.variants.size });
+
+    const cardBg = fill ?? (theme === "light" ? "#ffffff" : "#1e293b");
+    const cardBorder = stroke ?? (theme === "light" ? "#e2e8f0" : "#334155");
+    const imagePlaceholderColor = theme === "light" ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)";
+    const cardTextColor = getReadableTextColor(cardBg, text, theme);
+
+    return (
+      <div className="space-y-4">
+        <div
+          className="overflow-hidden border"
+          style={{
+            backgroundColor: cardBg,
+            borderColor: cardBorder,
+            borderRadius,
+            color: cardTextColor,
+            fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined
+          }}
+        >
+          <div className="h-28" style={{ backgroundColor: imagePlaceholderColor }} />
+          <div
+            style={
+              pad
+                ? { paddingTop: `${pad.top}px`, paddingRight: `${pad.right}px`, paddingBottom: `${pad.bottom}px`, paddingLeft: `${pad.left}px` }
+                : { padding: "16px" }
+            }
+          >
+            <p className="text-sm font-semibold leading-snug">Card title</p>
+            <p className="mt-1 text-xs leading-relaxed opacity-60">Supporting body text for the card content.</p>
+          </div>
+        </div>
+        {showSpecs && specs.length > 0 && (
+          <div className="space-y-1.5">
+            {specs.map((spec) => (
+              <div key={spec.label} className="grid grid-cols-[64px_1fr] gap-3 text-xs">
                 <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
                 <span className={ui.bodyText}>{spec.value}</span>
               </div>
