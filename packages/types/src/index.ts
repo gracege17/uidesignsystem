@@ -264,6 +264,7 @@ export type ComponentType =
   | "Badge"
   | "Modal"
   | "Navigation"
+  | "Accordion"
   | "Unknown";
 
 /**

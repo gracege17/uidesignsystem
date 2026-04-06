@@ -248,6 +248,273 @@ test("extractDesignSystem infers repeated components and maps token references",
   assert.equal(card.autoLayout?.counterAlignment, "stretch");
 });
 
+test("extractDesignSystem keeps differently padded buttons as separate component candidates", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.brand.compact",
+      tagName: "button",
+      classNames: ["button", "brand", "compact"],
+      textContent: "Buy now",
+      childCount: 1,
+      width: 124,
+      height: 48,
+      display: "flex",
+      paddingTop: 10,
+      paddingRight: 16,
+      paddingBottom: 10,
+      paddingLeft: 16,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      borderRadius: 16,
+      fontFamily: "Sora, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    },
+    {
+      source: "button.brand.roomy",
+      tagName: "button",
+      classNames: ["button", "brand", "roomy"],
+      textContent: "Buy now",
+      childCount: 1,
+      width: 156,
+      height: 48,
+      display: "flex",
+      paddingTop: 14,
+      paddingRight: 24,
+      paddingBottom: 14,
+      paddingLeft: 24,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      borderRadius: 16,
+      fontFamily: "Sora, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const buttons = result.components.filter((component) => component.type === "Button");
+  assert.equal(buttons.length, 2);
+  assert.deepEqual(
+    buttons.map((button) => button.padding && [button.padding.top, button.padding.right]).sort(),
+    [
+      [10, 16],
+      [14, 24]
+    ]
+  );
+});
+
+test("extractDesignSystem keeps differently rounded buttons as separate component candidates", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.brand.rounded",
+      tagName: "button",
+      classNames: ["button", "brand", "rounded"],
+      textContent: "Continue",
+      childCount: 1,
+      width: 144,
+      height: 48,
+      display: "flex",
+      paddingTop: 12,
+      paddingRight: 20,
+      paddingBottom: 12,
+      paddingLeft: 20,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      borderRadius: 999,
+      fontFamily: "Sora, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    },
+    {
+      source: "button.brand.square",
+      tagName: "button",
+      classNames: ["button", "brand", "square"],
+      textContent: "Continue",
+      childCount: 1,
+      width: 144,
+      height: 48,
+      display: "flex",
+      paddingTop: 12,
+      paddingRight: 20,
+      paddingBottom: 12,
+      paddingLeft: 20,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      borderRadius: 8,
+      fontFamily: "Sora, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const buttons = result.components.filter((component) => component.type === "Button");
+  assert.equal(buttons.length, 2);
+  assert.deepEqual(
+    buttons.map((button) => button.cornerRadius).sort((left, right) => left - right),
+    [8, 999]
+  );
+});
+
+test("extractDesignSystem keeps cards with different internal structure as separate component candidates", () => {
+  const result = extractDesignSystem([
+    {
+      source: "section.card.tight",
+      tagName: "section",
+      classNames: ["card", "tight"],
+      childCount: 3,
+      width: 320,
+      height: 220,
+      display: "flex",
+      gap: 12,
+      paddingTop: 24,
+      paddingRight: 24,
+      paddingBottom: 24,
+      paddingLeft: 24,
+      justifyContent: "flex-start",
+      alignItems: "stretch",
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      boxShadow: "0px 8px 24px -16px rgba(15, 23, 42, 0.18)"
+    },
+    {
+      source: "section.card.tight-alt",
+      tagName: "section",
+      classNames: ["card", "tight-alt"],
+      childCount: 3,
+      width: 320,
+      height: 220,
+      display: "flex",
+      gap: 12,
+      paddingTop: 24,
+      paddingRight: 24,
+      paddingBottom: 24,
+      paddingLeft: 24,
+      justifyContent: "flex-start",
+      alignItems: "stretch",
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      boxShadow: "0px 8px 24px -16px rgba(15, 23, 42, 0.18)"
+    },
+    {
+      source: "section.card.loose",
+      tagName: "section",
+      classNames: ["card", "loose"],
+      childCount: 3,
+      width: 320,
+      height: 220,
+      display: "flex",
+      gap: 24,
+      paddingTop: 24,
+      paddingRight: 24,
+      paddingBottom: 24,
+      paddingLeft: 24,
+      justifyContent: "flex-start",
+      alignItems: "stretch",
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      boxShadow: "0px 24px 60px -28px rgba(15, 23, 42, 0.35)"
+    },
+    {
+      source: "section.card.loose-alt",
+      tagName: "section",
+      classNames: ["card", "loose-alt"],
+      childCount: 3,
+      width: 320,
+      height: 220,
+      display: "flex",
+      gap: 24,
+      paddingTop: 24,
+      paddingRight: 24,
+      paddingBottom: 24,
+      paddingLeft: 24,
+      justifyContent: "flex-start",
+      alignItems: "stretch",
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      boxShadow: "0px 24px 60px -28px rgba(15, 23, 42, 0.35)"
+    }
+  ]);
+
+  const cards = result.components.filter((component) => component.type === "Card");
+  assert.equal(cards.length, 2);
+  assert.deepEqual(
+    cards.map((card) => card.autoLayout?.gap).sort((left, right) => left - right),
+    [12, 24]
+  );
+});
+
+test("extractDesignSystem keeps navigation variants with different gaps as separate component candidates", () => {
+  const result = extractDesignSystem([
+    {
+      source: "nav.site.primary",
+      tagName: "nav",
+      childCount: 4,
+      width: 1200,
+      height: 64,
+      display: "flex",
+      gap: 16,
+      paddingTop: 12,
+      paddingRight: 24,
+      paddingBottom: 12,
+      paddingLeft: 24,
+      justifyContent: "flex-start",
+      alignItems: "center",
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    },
+    {
+      source: "nav.site.secondary",
+      tagName: "nav",
+      childCount: 4,
+      width: 1200,
+      height: 64,
+      display: "flex",
+      gap: 32,
+      paddingTop: 12,
+      paddingRight: 24,
+      paddingBottom: 12,
+      paddingLeft: 24,
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    }
+  ]);
+
+  const navigation = result.components.filter((component) => component.type === "Navigation");
+  assert.equal(navigation.length, 2);
+  assert.deepEqual(
+    navigation.map((item) => item.autoLayout?.gap).sort((left, right) => left - right),
+    [16, 32]
+  );
+});
+
 // ─── extractLayoutMetrics ────────────────────────────────────────────────────
 
 test("extractLayoutMetrics: spacing scale only contains values that actually appear in the DOM", () => {
@@ -670,6 +937,340 @@ test("inferComponentType: tall <a> (hero banner) is NOT a Button", () => {
 
   const buttons = result.components.filter((c) => c.type === "Button");
   assert.equal(buttons.length, 0, "tall/wide <a> hero banner must not be classified as a Button");
+});
+
+// ─── Navigation component detection ─────────────────────────────────────────
+
+test("inferComponentType: <nav> element is classified as Navigation", () => {
+  const result = extractDesignSystem([
+    {
+      source: "nav.TopNav",
+      tagName: "nav",
+      childCount: 5,
+      width: 1200,
+      height: 64,
+      display: "flex",
+      gap: 32,
+      paddingTop: 0,
+      paddingRight: 24,
+      paddingBottom: 0,
+      paddingLeft: 24,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    }
+  ]);
+
+  const navComponents = result.components.filter((c) => c.type === "Navigation");
+  assert.equal(navComponents.length, 1, "<nav> element must be classified as Navigation");
+});
+
+test("inferComponentType: element with 'navigation' class is classified as Navigation", () => {
+  const result = extractDesignSystem([
+    {
+      source: "div.site-navigation",
+      tagName: "div",
+      classNames: ["site-navigation"],
+      childCount: 6,
+      width: 1200,
+      height: 72,
+      display: "flex",
+      backgroundColor: "rgb(15, 23, 42)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    }
+  ]);
+
+  const navComponents = result.components.filter((c) => c.type === "Navigation");
+  assert.equal(navComponents.length, 1, "element with 'navigation' class must be Navigation");
+});
+
+test("inferComponentType: element with 'menu' class is classified as Navigation", () => {
+  const result = extractDesignSystem([
+    {
+      source: "ul.main-menu",
+      tagName: "ul",
+      classNames: ["main-menu"],
+      childCount: 4,
+      width: 800,
+      height: 48,
+      display: "flex"
+    }
+  ]);
+
+  const navComponents = result.components.filter((c) => c.type === "Navigation");
+  assert.equal(navComponents.length, 1, "element with 'menu' class must be Navigation");
+});
+
+test("extractDesignSystem: Navigation captures cornerRadius and padding", () => {
+  const result = extractDesignSystem([
+    {
+      source: "nav.TopNav",
+      tagName: "nav",
+      childCount: 5,
+      width: 1200,
+      height: 64,
+      display: "flex",
+      paddingTop: 12,
+      paddingRight: 24,
+      paddingBottom: 12,
+      paddingLeft: 24,
+      borderRadius: 0,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    }
+  ]);
+
+  const nav = result.components.find((c) => c.type === "Navigation");
+  assert.ok(nav, "Navigation must be detected");
+  assert.equal(nav.cornerRadius, 0, "cornerRadius must be captured");
+
+  const pad = nav.padding ?? nav.autoLayout?.padding;
+  assert.ok(pad, "padding must be captured");
+  assert.equal(pad.top, 12);
+  assert.equal(pad.right, 24);
+  assert.equal(pad.bottom, 12);
+  assert.equal(pad.left, 24);
+});
+
+test("extractDesignSystem: Navigation maps fill and stroke color tokens", () => {
+  const result = extractDesignSystem([
+    {
+      source: "nav.SiteNav",
+      tagName: "nav",
+      childCount: 5,
+      width: 1440,
+      height: 64,
+      backgroundColor: "rgb(15, 23, 42)",
+      borderColor: "rgb(30, 41, 59)",
+      textColor: "rgb(248, 250, 252)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    }
+  ]);
+
+  const nav = result.components.find((c) => c.type === "Navigation");
+  assert.ok(nav, "Navigation must be detected");
+  assert.ok(nav.tokens.fills.length > 0, "Navigation must reference a fill token");
+  assert.ok(nav.tokens.strokes.length > 0, "Navigation must reference a stroke token");
+
+  const fillToken = result.tokens.colors.find((t) => nav.tokens.fills.includes(t.id));
+  assert.ok(fillToken, "fill token must exist in tokens list");
+  assert.equal(fillToken.role, "fill");
+
+  const strokeToken = result.tokens.colors.find((t) => nav.tokens.strokes.includes(t.id));
+  assert.ok(strokeToken, "stroke token must exist in tokens list");
+  assert.equal(strokeToken.role, "stroke");
+});
+
+test("extractDesignSystem: Navigation maps typography token", () => {
+  const result = extractDesignSystem([
+    {
+      source: "nav.TopNav",
+      tagName: "nav",
+      childCount: 5,
+      width: 1200,
+      height: 64,
+      backgroundColor: "rgb(255, 255, 255)",
+      fontFamily: "Sora, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    }
+  ]);
+
+  const nav = result.components.find((c) => c.type === "Navigation");
+  assert.ok(nav, "Navigation must be detected");
+  assert.ok(nav.tokens.typography.length > 0, "Navigation must reference a typography token");
+
+  const typographyToken = result.tokens.typography.find((t) => nav.tokens.typography.includes(t.id));
+  assert.ok(typographyToken, "typography token must exist in tokens list");
+  assert.equal(typographyToken.fontFamily, "Sora");
+});
+
+// ─── Accordion component detection ──────────────────────────────────────────
+
+test("inferComponentType: <details> element is classified as Accordion", () => {
+  const result = extractDesignSystem([
+    {
+      source: "details.faq-item",
+      tagName: "details",
+      childCount: 2,
+      width: 720,
+      height: 56,
+      borderColor: "rgb(226, 232, 240)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const accordions = result.components.filter((c) => c.type === "Accordion");
+  assert.equal(accordions.length, 1, "<details> element must be classified as Accordion");
+});
+
+test("inferComponentType: element with 'accordion' class is classified as Accordion", () => {
+  const result = extractDesignSystem([
+    {
+      source: "div.accordion-item",
+      tagName: "div",
+      classNames: ["accordion-item"],
+      childCount: 2,
+      width: 720,
+      height: 56,
+      borderColor: "rgb(226, 232, 240)"
+    }
+  ]);
+
+  const accordions = result.components.filter((c) => c.type === "Accordion");
+  assert.equal(accordions.length, 1, "element with 'accordion' class must be Accordion");
+});
+
+test("inferComponentType: element with 'faq' class is classified as Accordion", () => {
+  const result = extractDesignSystem([
+    {
+      source: "section.faq-section",
+      tagName: "section",
+      classNames: ["faq-section"],
+      childCount: 3,
+      width: 720,
+      height: 200
+    }
+  ]);
+
+  const accordions = result.components.filter((c) => c.type === "Accordion");
+  assert.equal(accordions.length, 1, "element with 'faq' class must be Accordion");
+});
+
+test("inferComponentType: element with 'disclosure' class is classified as Accordion", () => {
+  const result = extractDesignSystem([
+    {
+      source: "div.disclosure-panel",
+      tagName: "div",
+      classNames: ["disclosure-panel"],
+      childCount: 2,
+      width: 720,
+      height: 56
+    }
+  ]);
+
+  const accordions = result.components.filter((c) => c.type === "Accordion");
+  assert.equal(accordions.length, 1, "element with 'disclosure' class must be Accordion");
+});
+
+test("extractDesignSystem: Accordion kept at count === 1 (single instance on page)", () => {
+  const result = extractDesignSystem([
+    {
+      source: "div.accordion",
+      tagName: "div",
+      classNames: ["accordion"],
+      childCount: 3,
+      width: 720,
+      height: 200,
+      borderColor: "rgb(226, 232, 240)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const accordions = result.components.filter((c) => c.type === "Accordion");
+  assert.equal(accordions.length, 1, "Accordion must be kept even with a single instance");
+});
+
+test("extractDesignSystem: Accordion maps stroke and typography tokens", () => {
+  const result = extractDesignSystem([
+    {
+      source: "details.expandable",
+      tagName: "details",
+      classNames: ["expandable"],
+      childCount: 2,
+      width: 720,
+      height: 56,
+      borderColor: "rgb(226, 232, 240)",
+      textColor: "rgb(15, 23, 42)",
+      fontFamily: "Sora, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const accordion = result.components.find((c) => c.type === "Accordion");
+  assert.ok(accordion, "Accordion must be detected");
+  assert.ok(accordion.tokens.strokes.length > 0, "Accordion must reference a stroke token for divider");
+  assert.ok(accordion.tokens.typography.length > 0, "Accordion must reference a typography token");
+
+  const typographyToken = result.tokens.typography.find((t) => accordion.tokens.typography.includes(t.id));
+  assert.ok(typographyToken, "typography token must exist");
+  assert.equal(typographyToken.fontFamily, "Sora");
+});
+
+test("inferComponentType: element with ariaExpanded is classified as Accordion", () => {
+  const result = extractDesignSystem([
+    {
+      source: "div.feature-trigger",
+      tagName: "div",
+      ariaExpanded: false,
+      childCount: 2,
+      width: 720,
+      height: 56,
+      borderColor: "rgb(226, 232, 240)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const accordions = result.components.filter((c) => c.type === "Accordion");
+  assert.equal(accordions.length, 1, "element with ariaExpanded must be classified as Accordion");
+});
+
+test("inferComponentType: element with ariaExpanded=true (open state) is also Accordion", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.accordion-trigger",
+      tagName: "button",
+      ariaExpanded: true,
+      textContent: "Sync hours with payroll",
+      childCount: 1,
+      width: 720,
+      height: 56,
+      borderColor: "rgb(226, 232, 240)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  // ariaExpanded wins over the button tagName detection
+  const accordions = result.components.filter((c) => c.type === "Accordion");
+  assert.equal(accordions.length, 1, "button with ariaExpanded must be Accordion, not Button");
 });
 
 test("inferComponentType: <a> with background but too many children is NOT a Button", () => {

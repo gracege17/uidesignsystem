@@ -35,6 +35,7 @@ export interface SerializedStyleNode {
   maxWidth?: number;
   borderRadius?: number | string;
   role?: string;
+  ariaExpanded?: boolean;
   href?: string;
   inputType?: string;
   disabled?: boolean;
@@ -317,6 +318,9 @@ function collectComponentCandidates(nodes: SerializedStyleNode[]): ComponentCand
       normalizeColor(node.textColor) ?? "",
       normalizeFontFamily(node.fontFamily ?? "") || "",
       normalizeLength(node.fontSize) ?? "",
+      makeSpacingSignature(node),
+      normalizeLength(node.borderRadius) ?? "",
+      makeStructureSignature(node),
       inferSemanticStem([node.source], "component") ?? ""
     ].join("|");
 
@@ -348,6 +352,7 @@ function shouldKeepComponentCandidate(candidate: ComponentCandidate): boolean {
   return (
     candidate.type === "Modal" ||
     candidate.type === "Navigation" ||
+    candidate.type === "Accordion" ||
     candidate.type === "Input" ||
     candidate.type === "Button"
   );
@@ -378,6 +383,16 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
   ]
     .join(" ")
     .toLowerCase();
+
+  // aria-expanded is a reliable accordion trigger signal — check it before button detection
+  // so that <button aria-expanded> is classified as Accordion, not Button.
+  if (
+    node.tagName === "details" ||
+    node.ariaExpanded !== undefined ||
+    /\b(accordion|disclosure|faq|expandable|collapsible)\b/.test(haystack)
+  ) {
+    return "Accordion";
+  }
 
   // <a> tags are only buttons when they look like one: small, few children, non-empty label.
   // A bare "has background" check catches nav links, hero banners, card wrappers — all noise.
@@ -502,6 +517,35 @@ function inferPadding(node: SerializedStyleNode): AutoLayout["padding"] | undefi
   const left = normalizeLength(node.paddingLeft) ?? 0;
   if (top === 0 && right === 0 && bottom === 0 && left === 0) return undefined;
   return { top, right, bottom, left };
+}
+
+function makeSpacingSignature(node: SerializedStyleNode): string {
+  const padding = inferPadding(node);
+  if (!padding) {
+    return "0|0|0|0";
+  }
+
+  return [padding.top, padding.right, padding.bottom, padding.left].join("|");
+}
+
+function makeStructureSignature(node: SerializedStyleNode): string {
+  return [
+    node.display?.toLowerCase() ?? "",
+    normalizeLength(node.gap) ?? 0,
+    node.justifyContent?.toLowerCase() ?? "",
+    node.alignItems?.toLowerCase() ?? "",
+    node.flexWrap?.toLowerCase() ?? "",
+    node.gridTemplateColumns ? parseGridColumns(node.gridTemplateColumns) : 0,
+    normalizeShadowSignature(node.boxShadow)
+  ].join("|");
+}
+
+function normalizeShadowSignature(value: string | undefined): string {
+  if (!value || value === "none") {
+    return "";
+  }
+
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function parseGridColumns(gridTemplateColumns: string): number {

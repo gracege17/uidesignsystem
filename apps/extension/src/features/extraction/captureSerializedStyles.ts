@@ -132,6 +132,77 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
     return score;
   };
 
+  const resolvePadding = (
+    element: HTMLElement,
+    style: CSSStyleDeclaration
+  ): Pick<
+    SerializedStyleNode,
+    "paddingTop" | "paddingRight" | "paddingBottom" | "paddingLeft"
+  > => {
+    const selfPadding = {
+      paddingTop: parsePx(style.paddingTop) ?? 0,
+      paddingRight: parsePx(style.paddingRight) ?? 0,
+      paddingBottom: parsePx(style.paddingBottom) ?? 0,
+      paddingLeft: parsePx(style.paddingLeft) ?? 0
+    };
+
+    if (
+      selfPadding.paddingTop +
+        selfPadding.paddingRight +
+        selfPadding.paddingBottom +
+        selfPadding.paddingLeft >
+      0
+    ) {
+      return selfPadding;
+    }
+
+    const tagName = element.tagName.toLowerCase();
+    const isButtonLike =
+      tagName === "button" ||
+      element.getAttribute("role") === "button" ||
+      (tagName === "a" && Boolean(element.textContent?.trim()));
+
+    if (!isButtonLike) {
+      return {
+        paddingTop: undefined,
+        paddingRight: undefined,
+        paddingBottom: undefined,
+        paddingLeft: undefined
+      };
+    }
+
+    let bestCandidate:
+      | Pick<SerializedStyleNode, "paddingTop" | "paddingRight" | "paddingBottom" | "paddingLeft">
+      | undefined;
+    let bestScore = 0;
+
+    for (const descendant of Array.from(element.querySelectorAll<HTMLElement>("*")).slice(0, 12)) {
+      const descendantStyles = window.getComputedStyle(descendant);
+      const candidate = {
+        paddingTop: parsePx(descendantStyles.paddingTop) ?? 0,
+        paddingRight: parsePx(descendantStyles.paddingRight) ?? 0,
+        paddingBottom: parsePx(descendantStyles.paddingBottom) ?? 0,
+        paddingLeft: parsePx(descendantStyles.paddingLeft) ?? 0
+      };
+      const score =
+        candidate.paddingTop + candidate.paddingRight + candidate.paddingBottom + candidate.paddingLeft;
+
+      if (score > bestScore) {
+        bestCandidate = candidate;
+        bestScore = score;
+      }
+    }
+
+    return (
+      bestCandidate ?? {
+        paddingTop: undefined,
+        paddingRight: undefined,
+        paddingBottom: undefined,
+        paddingLeft: undefined
+      }
+    );
+  };
+
   const maxNodes = 300;
   const elements = Array.from(document.querySelectorAll<HTMLElement>("*"));
 
@@ -207,33 +278,7 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         })(),
         gridTemplateColumns: style.display === "grid" ? style.gridTemplateColumns : undefined,
         maxWidth: style.maxWidth !== "none" ? parsePx(style.maxWidth) : undefined,
-        ...(() => {
-          const pt = parsePx(style.paddingTop) ?? 0;
-          const pr = parsePx(style.paddingRight) ?? 0;
-          const pb = parsePx(style.paddingBottom) ?? 0;
-          const pl = parsePx(style.paddingLeft) ?? 0;
-          if (pt + pr + pb + pl > 0) {
-            return { paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl };
-          }
-
-          const firstChild = element.children[0] as HTMLElement | undefined;
-          if (!firstChild) {
-            return {
-              paddingTop: undefined,
-              paddingRight: undefined,
-              paddingBottom: undefined,
-              paddingLeft: undefined
-            };
-          }
-
-          const childStyles = window.getComputedStyle(firstChild);
-          return {
-            paddingTop: parsePx(childStyles.paddingTop),
-            paddingRight: parsePx(childStyles.paddingRight),
-            paddingBottom: parsePx(childStyles.paddingBottom),
-            paddingLeft: parsePx(childStyles.paddingLeft)
-          };
-        })(),
+        ...resolvePadding(element, style),
         justifyContent: style.justifyContent,
         alignItems: style.alignItems,
         flexWrap: style.flexWrap,

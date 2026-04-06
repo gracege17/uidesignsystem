@@ -167,6 +167,11 @@ The parser returns an `ExtractionResult` with:
 
 This model is defined in [packages/types/src/index.ts](/Users/tianmeizige/uidesignsystem/packages/types/src/index.ts).
 
+## Extraction Guardrails
+
+- Button padding and corner radius are part of component identity. Do not group button candidates only by color, typography, and size.
+- Button padding may live on a nested wrapper instead of the clickable element itself, so extraction logic must not assume the first child carries the real spacing.
+
 ## Current Limitations
 
 This is still a prototype. Current tradeoffs:

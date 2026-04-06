@@ -814,17 +814,20 @@ function ComponentPreview({
     const navBorder = stroke ?? (theme === "light" ? "#e2e8f0" : "#334155");
     const navText = getReadableTextColor(navBg, text, theme);
     const pad = component.padding ?? component.autoLayout?.padding;
+    const gap = component.autoLayout?.gap ?? 16;
 
     const specs: { label: string; value: string }[] = [];
     if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
     if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
     if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+    if (component.autoLayout?.gap) specs.push({ label: "Gap", value: `${component.autoLayout.gap}px` });
 
     return (
       <div className="space-y-4">
         <div
-          className="flex items-center gap-4 border px-5 py-3 text-sm"
+          className="flex items-center border text-sm"
           style={{
+            gap: `${gap}px`,
             backgroundColor: navBg,
             borderColor: navBorder,
             borderRadius,
@@ -832,6 +835,14 @@ function ComponentPreview({
             fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
             fontSize: type ? `${Math.min(type.fontSize, 18)}px` : undefined,
             fontWeight: type?.fontWeight,
+            ...(pad
+              ? {
+                  paddingTop: `${pad.top}px`,
+                  paddingRight: `${pad.right}px`,
+                  paddingBottom: `${pad.bottom}px`,
+                  paddingLeft: `${pad.left}px`
+                }
+              : { padding: "12px 20px" })
           }}
         >
           <span>Overview</span>
@@ -853,15 +864,34 @@ function ComponentPreview({
   }
 
   if (component.type === "Accordion") {
+    const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "8px";
+    const accordionBg = fill ?? "transparent";
     const dividerColor = stroke ?? (theme === "light" ? "#e2e8f0" : "#334155");
     const headingText = text ?? (theme === "light" ? "#0f172a" : "#f8fafc");
     const bodyTextColor = theme === "light" ? "#475569" : "#94a3b8";
+    const pad = component.padding ?? component.autoLayout?.padding;
     const specs: { label: string; value: string }[] = [];
     if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+    if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
+    if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
 
     return (
       <div className="space-y-4">
-        <div style={{ fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined }}>
+        <div
+          style={{
+            backgroundColor: accordionBg,
+            borderRadius,
+            fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
+            ...(pad
+              ? {
+                  paddingTop: `${pad.top}px`,
+                  paddingRight: `${pad.right}px`,
+                  paddingBottom: `${pad.bottom}px`,
+                  paddingLeft: `${pad.left}px`
+                }
+              : {})
+          }}
+        >
           {/* collapsed row */}
           <div
             className="flex items-center justify-between py-4 text-sm"
@@ -896,6 +926,128 @@ function ComponentPreview({
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.5 }}>
               <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
+          </div>
+        </div>
+        {showSpecs && specs.length > 0 && (
+          <div className="space-y-1.5">
+            {specs.map((spec) => (
+              <div key={spec.label} className="grid grid-cols-[64px_1fr] gap-3 text-xs">
+                <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
+                <span className={ui.bodyText}>{spec.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (component.type === "Input") {
+    const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "10px";
+    const inputBg = fill ?? (theme === "light" ? "#ffffff" : "#0f172a");
+    const inputBorder = stroke ?? (theme === "light" ? "#cbd5e1" : "#334155");
+    const inputText = getReadableTextColor(inputBg, text, theme);
+    const pad = component.padding ?? component.autoLayout?.padding;
+    const specs: { label: string; value: string }[] = [];
+    if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+    if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
+    if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+    specs.push({ label: "Size", value: component.variants.size });
+
+    return (
+      <div className="space-y-4">
+        <div
+          className="border"
+          style={{
+            backgroundColor: inputBg,
+            borderColor: inputBorder,
+            borderRadius,
+            color: inputText,
+            fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
+            fontSize: type ? `${Math.min(type.fontSize, 18)}px` : undefined,
+            fontWeight: type?.fontWeight,
+            ...(pad
+              ? {
+                  paddingTop: `${pad.top}px`,
+                  paddingRight: `${pad.right}px`,
+                  paddingBottom: `${pad.bottom}px`,
+                  paddingLeft: `${pad.left}px`
+                }
+              : { padding: "12px 14px" })
+          }}
+        >
+          <span style={{ opacity: 0.55 }}>Email address</span>
+        </div>
+        {showSpecs && specs.length > 0 && (
+          <div className="space-y-1.5">
+            {specs.map((spec) => (
+              <div key={spec.label} className="grid grid-cols-[64px_1fr] gap-3 text-xs">
+                <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
+                <span className={ui.bodyText}>{spec.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (component.type === "Modal") {
+    const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "20px";
+    const modalBg = fill ?? (theme === "light" ? "#ffffff" : "#0f172a");
+    const modalBorder = stroke ?? (theme === "light" ? "#e2e8f0" : "#334155");
+    const modalText = getReadableTextColor(modalBg, text, theme);
+    const pad = component.padding ?? component.autoLayout?.padding;
+    const specs: { label: string; value: string }[] = [];
+    if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+    if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
+    if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+    if (component.tokens.effects.length > 0) specs.push({ label: "Effect", value: "shadow" });
+
+    return (
+      <div className="space-y-4">
+        <div className="rounded-[24px] p-4" style={{ backgroundColor: theme === "light" ? "#f1f5f9" : "#020617" }}>
+          <div
+            className="border"
+            style={{
+              backgroundColor: modalBg,
+              borderColor: modalBorder,
+              borderRadius,
+              color: modalText,
+              fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
+              ...(pad
+                ? {
+                    paddingTop: `${pad.top}px`,
+                    paddingRight: `${pad.right}px`,
+                    paddingBottom: `${pad.bottom}px`,
+                    paddingLeft: `${pad.left}px`
+                  }
+                : { padding: "24px" })
+            }}
+          >
+            <p className="text-base font-semibold">Invite your team</p>
+            <p className="mt-2 text-sm opacity-70">
+              Add collaborators and assign workspace permissions.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-full border px-4 py-2 text-sm"
+                style={{ borderColor: modalBorder, color: modalText, backgroundColor: "transparent" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-full px-4 py-2 text-sm font-medium"
+                style={{
+                  backgroundColor: text ? "transparent" : (theme === "light" ? "#0f172a" : "#f8fafc"),
+                  color: text ?? (theme === "light" ? "#ffffff" : "#0f172a")
+                }}
+              >
+                Invite
+              </button>
+            </div>
           </div>
         </div>
         {showSpecs && specs.length > 0 && (
