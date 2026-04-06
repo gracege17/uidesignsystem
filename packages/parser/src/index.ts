@@ -347,17 +347,24 @@ function collectComponentCandidates(nodes: SerializedStyleNode[]): ComponentCand
 }
 
 function shouldKeepComponentCandidate(candidate: ComponentCandidate): boolean {
-  if (candidate.count > 1) {
-    return true;
+  switch (candidate.type) {
+    case "Button":
+      return hasButtonConfidence(candidate.node);
+    case "Input":
+      return hasInputConfidence(candidate.node);
+    case "Navigation":
+      return hasNavigationConfidence(candidate.node);
+    case "Modal":
+      return hasModalConfidence(candidate.node);
+    case "Accordion":
+      return hasAccordionConfidence(candidate.node);
+    case "Card":
+      return hasCardConfidence(candidate.node, candidate.count);
+    case "Badge":
+      return hasBadgeConfidence(candidate.node, candidate.count);
+    default:
+      return false;
   }
-
-  return (
-    candidate.type === "Modal" ||
-    candidate.type === "Navigation" ||
-    candidate.type === "Accordion" ||
-    candidate.type === "Input" ||
-    candidate.type === "Button"
-  );
 }
 
 function isRootLevelNode(node: SerializedStyleNode): boolean {
@@ -456,6 +463,109 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
   }
 
   return "Unknown";
+}
+
+function hasButtonConfidence(node: SerializedStyleNode): boolean {
+  const tagName = (node.tagName ?? "").toLowerCase();
+  const source = buildComponentHaystack(node);
+  return (
+    tagName === "button" ||
+    /\b(btn|button|cta)\b/.test(source) ||
+    (tagName === "a" &&
+      Boolean(node.textContent?.trim()) &&
+      ((node.height ?? 0) > 0 && (node.height ?? 0) <= 80) &&
+      Boolean(node.backgroundColor || node.borderColor))
+  );
+}
+
+function hasInputConfidence(node: SerializedStyleNode): boolean {
+  const tagName = (node.tagName ?? "").toLowerCase();
+  const source = buildComponentHaystack(node);
+  return (
+    ["input", "textarea", "select"].includes(tagName) ||
+    /\b(input|field|search|textarea|select)\b/.test(source)
+  );
+}
+
+function hasNavigationConfidence(node: SerializedStyleNode): boolean {
+  const tagName = (node.tagName ?? "").toLowerCase();
+  const source = buildComponentHaystack(node);
+  return tagName === "nav" || /\b(nav|navigation|menu|tabs?)\b/.test(source);
+}
+
+function hasModalConfidence(node: SerializedStyleNode): boolean {
+  const source = buildComponentHaystack(node);
+  return node.role === "dialog" || /\b(modal|dialog|drawer|sheet)\b/.test(source);
+}
+
+function hasAccordionConfidence(node: SerializedStyleNode): boolean {
+  const tagName = (node.tagName ?? "").toLowerCase();
+  const source = buildComponentHaystack(node);
+  if (tagName === "details" || /\b(accordion|disclosure|faq|expandable|collapsible)\b/.test(source)) {
+    return true;
+  }
+
+  return (
+    node.ariaExpanded !== undefined &&
+    (Boolean(node.borderColor) || (node.childCount ?? 0) >= 2)
+  );
+}
+
+function hasCardConfidence(node: SerializedStyleNode, count: number): boolean {
+  if (count <= 1) {
+    return false;
+  }
+
+  const source = buildComponentHaystack(node);
+  if (/\b(card|panel|tile)\b/.test(source)) {
+    return true;
+  }
+
+  const hasContainment = Boolean(node.boxShadow || node.borderColor || node.backgroundColor);
+  const hasStructure =
+    (node.childCount ?? 0) >= 2 &&
+    (node.height ?? 0) >= 80 &&
+    (node.width ?? 0) >= 160 &&
+    (node.width ?? 0) < 900;
+  const hasBoxTreatment =
+    hasPadding(node) ||
+    (normalizeLength(node.borderRadius) ?? 0) >= 8 ||
+    Boolean(node.boxShadow);
+
+  return hasContainment && hasStructure && hasBoxTreatment;
+}
+
+function hasBadgeConfidence(node: SerializedStyleNode, count: number): boolean {
+  const source = buildComponentHaystack(node);
+  if (/\b(badge|chip|pill|tag)\b/.test(source)) {
+    return true;
+  }
+
+  return (
+    count > 1 &&
+    (node.height ?? 0) <= 36 &&
+    (normalizeLength(node.borderRadius) ?? 0) >= 12 &&
+    Boolean(node.textContent?.trim())
+  );
+}
+
+function hasPadding(node: SerializedStyleNode): boolean {
+  return [node.paddingTop, node.paddingRight, node.paddingBottom, node.paddingLeft].some(
+    (value) => (normalizeLength(value) ?? 0) > 0
+  );
+}
+
+function buildComponentHaystack(node: SerializedStyleNode): string {
+  return [
+    node.tagName,
+    node.role,
+    node.inputType,
+    node.href ? "link" : "",
+    node.source,
+    ...(node.classNames ?? [])
+  ]
+    .join(" ")
+    .toLowerCase();
 }
 
 function inferComponentVariants(node: SerializedStyleNode): ComponentVariants {

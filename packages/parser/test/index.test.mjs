@@ -752,6 +752,32 @@ test("extractDesignSystem: a single card-like element is not extracted (needs 2+
   assert.equal(cardComponents.length, 0, "a single card instance must be filtered out");
 });
 
+test("extractDesignSystem: repeated generic bordered containers are not promoted to Card", () => {
+  const result = extractDesignSystem([
+    {
+      source: "section.content-block",
+      tagName: "section",
+      childCount: 2,
+      width: 320,
+      height: 160,
+      display: "block",
+      borderColor: "rgb(226, 232, 240)"
+    },
+    {
+      source: "section.content-block-alt",
+      tagName: "section",
+      childCount: 2,
+      width: 320,
+      height: 160,
+      display: "block",
+      borderColor: "rgb(226, 232, 240)"
+    }
+  ]);
+
+  const cards = result.components.filter((component) => component.type === "Card");
+  assert.equal(cards.length, 0, "generic bordered sections must not be extracted as Card");
+});
+
 test("extractDesignSystem: two card elements produce exactly one Card component", () => {
   const result = extractDesignSystem([
     {
@@ -1247,6 +1273,23 @@ test("inferComponentType: element with ariaExpanded is classified as Accordion",
 
   const accordions = result.components.filter((c) => c.type === "Accordion");
   assert.equal(accordions.length, 1, "element with ariaExpanded must be classified as Accordion");
+});
+
+test("extractDesignSystem: bare aria-expanded toggles are not promoted to Accordion", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.toggle",
+      tagName: "button",
+      ariaExpanded: false,
+      textContent: "Toggle",
+      childCount: 1,
+      width: 80,
+      height: 24
+    }
+  ]);
+
+  const accordions = result.components.filter((component) => component.type === "Accordion");
+  assert.equal(accordions.length, 0, "bare aria-expanded toggles must not be extracted as Accordion");
 });
 
 test("inferComponentType: element with ariaExpanded=true (open state) is also Accordion", () => {
