@@ -294,6 +294,8 @@ export function extractComponents(
       autoLayout: inferAutoLayout(candidate.node),
       cornerRadius: normalizeLength(candidate.node.borderRadius) ?? undefined,
       padding: inferPadding(candidate.node),
+      width: normalizeLength(candidate.node.width) ?? undefined,
+      height: normalizeLength(candidate.node.height) ?? undefined,
       textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })()
     };
   });

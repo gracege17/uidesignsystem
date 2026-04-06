@@ -374,6 +374,14 @@ export interface ExtractedComponent extends ComponentBase {
    */
   padding?: Spacing;
   /**
+   * Width of the extracted component root in pixels, when available.
+   */
+  width?: PixelValue;
+  /**
+   * Height of the extracted component root in pixels, when available.
+   */
+  height?: PixelValue;
+  /**
    * Visible text content of the component, if present.
    */
   textContent?: string;

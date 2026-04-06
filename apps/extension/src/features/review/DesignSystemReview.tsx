@@ -693,6 +693,14 @@ function scorePrimaryButton(component: ExtractedComponent): number {
     score += 20;
   }
 
+  if (component.width) {
+    score += Math.min(component.width, 320) * 0.2;
+  }
+
+  if (component.height) {
+    score += Math.min(component.height, 72) * 0.4;
+  }
+
   const padding = component.padding ?? component.autoLayout?.padding;
   if (padding) {
     score += padding.left + padding.right;
