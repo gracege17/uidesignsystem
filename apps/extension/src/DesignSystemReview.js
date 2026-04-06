@@ -70,7 +70,7 @@ function TypographySection({ tokens, summary, theme }) {
         seenIds.add(entry.token.id);
         return true;
     });
-    return (_jsxs("div", { className: "space-y-8", children: [_jsx("div", { className: `${ui.heroPanel} grid gap-10 ${summary.fontFamilies.length > 1 ? "md:grid-cols-2" : ""}`, children: summary.fontFamilies.length === 0 ? (_jsxs("div", { children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Typeface" }), _jsx("p", { className: `mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: "\u2014" })] })) : summary.fontFamilies.map((family) => (_jsxs("div", { children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Typeface" }), _jsx("p", { className: `mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: family })] }, family))) }), _jsx("div", { className: "space-y-8", children: scale.map(({ role, token }) => (_jsxs("div", { className: `border-t pt-6 ${ui.rule}`, children: [_jsxs("div", { className: `mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px_100px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: [_jsxs("span", { children: [role, " \u2014 ", token.fontFamily] }), _jsx("span", { children: "Font Size" }), _jsx("span", { children: "Line Height" }), _jsx("span", { children: "Letter Space" })] }), _jsxs("div", { className: "grid grid-cols-[minmax(0,1fr)_100px_100px_100px] gap-4", children: [_jsx("p", { className: `pr-6 ${ui.headingText}`, style: {
+    return (_jsxs("div", { className: "space-y-8", children: [_jsx("div", { className: `${ui.heroPanel} grid gap-10 ${summary.fontFamilies.length > 1 ? "md:grid-cols-2" : ""}`, children: summary.fontFamilies.length === 0 ? (_jsxs("div", { children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Typeface" }), _jsx("p", { className: `mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: "\u2014" })] })) : summary.fontFamilies.map((family) => (_jsxs("div", { children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`, children: "Typeface" }), _jsx("p", { className: `mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`, children: family }), _jsxs("p", { className: `mt-2 text-[11px] ${ui.heroMetaText}`, children: ["Preview uses a system fallback \u2014 not the actual font. To use ", _jsx("span", { className: "italic", children: family }), ", source it separately."] })] }, family))) }), _jsx("div", { className: "space-y-8", children: scale.map(({ role, token }) => (_jsxs("div", { className: `border-t pt-6 ${ui.rule}`, children: [_jsxs("div", { className: `mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px_100px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: [_jsxs("span", { children: [role, " \u2014 ", token.fontFamily] }), _jsx("span", { children: "Font Size" }), _jsx("span", { children: "Line Height" }), _jsx("span", { children: "Letter Space" })] }), _jsxs("div", { className: "grid grid-cols-[minmax(0,1fr)_100px_100px_100px] gap-4", children: [_jsx("p", { className: `pr-6 ${ui.headingText}`, style: {
                                         fontSize: `${Math.min(token.fontSize, 64)}px`,
                                         lineHeight: `${Math.min(token.lineHeight, 72)}px`,
                                         fontWeight: token.fontWeight,
@@ -408,8 +408,10 @@ function buildColorCopy(summary) {
 }
 function buildTypographyCopy(summary) {
     const lines = ["Typography"];
-    if (summary.fontFamilies.length > 0)
+    if (summary.fontFamilies.length > 0) {
         lines.push(`- Typefaces: ${summary.fontFamilies.join(", ")}`);
+        lines.push(`  Note: The preview above uses a system fallback font, not the actual typeface. Source ${summary.fontFamilies.join(", ")} separately to match the original.`);
+    }
     if (summary.h1)
         lines.push(`- H1: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight} / ls ${summary.h1.letterSpacing}px`);
     if (summary.h2)

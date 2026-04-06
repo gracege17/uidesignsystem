@@ -275,6 +275,9 @@ function TypographySection({
           <div key={family}>
             <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>Typeface</p>
             <p className={`mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`}>{family}</p>
+            <p className={`mt-2 text-[11px] ${ui.heroMetaText}`}>
+              Preview uses a system fallback — not the actual font. To use <span className="italic">{family}</span>, source it separately.
+            </p>
           </div>
         ))}
       </div>
@@ -919,7 +922,10 @@ function buildColorCopy(summary: SummaryModel) {
 
 function buildTypographyCopy(summary: SummaryModel) {
   const lines = ["Typography"];
-  if (summary.fontFamilies.length > 0) lines.push(`- Typefaces: ${summary.fontFamilies.join(", ")}`);
+  if (summary.fontFamilies.length > 0) {
+    lines.push(`- Typefaces: ${summary.fontFamilies.join(", ")}`);
+    lines.push(`  Note: The preview above uses a system fallback font, not the actual typeface. Source ${summary.fontFamilies.join(", ")} separately to match the original.`);
+  }
   if (summary.h1) lines.push(`- H1: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight} / ls ${summary.h1.letterSpacing}px`);
   if (summary.h2) lines.push(`- H2: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight} / ls ${summary.h2.letterSpacing}px`);
   if (summary.h3) lines.push(`- H3: ${summary.h3.fontSize}px / ${summary.h3.lineHeight}px / weight ${summary.h3.fontWeight} / ls ${summary.h3.letterSpacing}px`);
