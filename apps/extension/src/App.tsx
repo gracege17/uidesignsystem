@@ -152,10 +152,13 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
     }
 
     const classes = Array.from(element.classList);
-    // Prefer semantic class names (CSS modules, BEM) over obfuscated short ones.
-    // Semantic classes tend to be longer and contain underscores or capital letters.
-    const semantic = classes.find((c) => c.length > 6 && /[_A-Z]/.test(c));
-    const picked = semantic ? [semantic, ...classes.filter((c) => c !== semantic).slice(0, 1)] : classes.slice(0, 2);
+    // A hashed class looks like "abc_XyZ3a" or "gwb_S-Ue6" — a short prefix, underscore,
+    // then a base64/hash segment. Filter these out before picking a semantic name.
+    const isHashed = (c: string) => /^[a-z]{2,6}_[A-Za-z0-9\-]{3,}$/.test(c);
+    const readable = classes.filter((c) => !isHashed(c));
+    const pool = readable.length > 0 ? readable : classes;
+    const semantic = pool.find((c) => c.length > 6 && /[_A-Z-]/.test(c));
+    const picked = semantic ? [semantic, ...pool.filter((c) => c !== semantic).slice(0, 1)] : pool.slice(0, 2);
     const className = picked.join(".");
     return className ? `${tagName}.${className}` : tagName;
   };
