@@ -23,14 +23,14 @@ export default function DesignSystemReview({ result, layout = "stacked", theme =
     if (layout === "split") {
         return (_jsxs("div", { className: "grid min-h-[780px] grid-cols-[180px_minmax(0,1fr)] gap-8", children: [_jsx("aside", { className: `border-r pr-6 ${ui.sidebarBorder}`, children: _jsxs("div", { className: "sticky top-8", children: [_jsx("p", { className: `text-[11px] uppercase tracking-[0.24em] ${ui.mutedText}`, children: "Basics" }), _jsx("nav", { className: "mt-6 space-y-1", children: REVIEW_TABS.map((tab) => (_jsx("button", { type: "button", onClick: () => setActiveTab(tab.id), className: `block w-full border-l-2 py-2 pl-4 text-left text-sm transition ${activeTab === tab.id ? ui.navActive : ui.navIdle}`, children: tab.label }, tab.id))) })] }) }), _jsx("main", { className: "min-w-0", children: _jsx(SplitSection, { tab: activeTab, result: result, summary: summary, theme: theme, copiedKey: copiedKey, onCopy: copySection }) })] }));
     }
-    return (_jsxs("div", { className: "space-y-12", children: [_jsx(SectionShell, { title: "Overview", subtitle: "Key extracted foundations and primary signals.", theme: theme, copyLabel: "Copy Everything", copied: copiedKey === "everything", onCopy: () => void copySection("everything"), children: _jsx(OverviewSection, { summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Color Styles", subtitle: "Colors extracted from the page, grouped by where they were found (fill, stroke, text).", theme: theme, copyLabel: "Copy Color", copied: copiedKey === "color", onCopy: () => void copySection("color"), children: _jsx(ColorSection, { tokens: result.tokens, summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Typography", subtitle: "Font families and text styles extracted from the page, ordered by size.", theme: theme, copyLabel: "Copy Typography", copied: copiedKey === "typography", onCopy: () => void copySection("typography"), children: _jsx(TypographySection, { tokens: result.tokens, summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Spacing & Layout", subtitle: "Content width, page margins, and spacing scale extracted from the page.", theme: theme, copyLabel: "Copy Layout", copied: copiedKey === "layout", onCopy: () => void copySection("layout"), children: _jsx(LayoutSection, { layout: result.layout, theme: theme }) }), _jsx(SectionShell, { title: "Components", subtitle: "Top reusable component families extracted from the page.", theme: theme, copyLabel: "Copy Components", copied: copiedKey === "components", onCopy: () => void copySection("components"), children: _jsx(ComponentsSection, { result: result, summary: summary, theme: theme }) })] }));
+    return (_jsxs("div", { className: "space-y-12", children: [_jsx(SectionShell, { title: "Overview", subtitle: "Key extracted foundations and primary signals.", theme: theme, copyLabel: "Copy Everything", copied: copiedKey === "everything", onCopy: () => void copySection("everything"), children: _jsx(OverviewSection, { summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Color Styles", subtitle: "Color styles extracted from the page, grouped by role.", theme: theme, copyLabel: "Copy Color", copied: copiedKey === "color", onCopy: () => void copySection("color"), children: _jsx(ColorSection, { tokens: result.tokens, summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Typography", subtitle: "Font families and text styles extracted from the page, ordered by size.", theme: theme, copyLabel: "Copy Typography", copied: copiedKey === "typography", onCopy: () => void copySection("typography"), children: _jsx(TypographySection, { tokens: result.tokens, summary: summary, theme: theme }) }), _jsx(SectionShell, { title: "Spacing & Layout", subtitle: "Content width, page margins, and spacing scale extracted from the page.", theme: theme, copyLabel: "Copy Layout", copied: copiedKey === "layout", onCopy: () => void copySection("layout"), children: _jsx(LayoutSection, { layout: result.layout, theme: theme }) }), _jsx(SectionShell, { title: "Components", subtitle: "Top reusable component families extracted from the page.", theme: theme, copyLabel: "Copy Components", copied: copiedKey === "components", onCopy: () => void copySection("components"), children: _jsx(ComponentsSection, { result: result, summary: summary, theme: theme }) })] }));
 }
 function SplitSection({ tab, result, summary, theme, copiedKey, onCopy }) {
     if (tab === "overview") {
         return (_jsx(SectionShell, { title: "Overview", subtitle: "Start here to identify the main design-system signals.", theme: theme, copyLabel: "Copy Everything", copied: copiedKey === "everything", onCopy: () => void onCopy("everything"), children: _jsx(OverviewSection, { summary: summary, theme: theme }) }));
     }
     if (tab === "color") {
-        return (_jsx(SectionShell, { title: "Color Styles", subtitle: "Colors extracted from the page, grouped by where they were found (fill, stroke, text).", theme: theme, copyLabel: "Copy Color", copied: copiedKey === "color", onCopy: () => void onCopy("color"), children: _jsx(ColorSection, { tokens: result.tokens, summary: summary, theme: theme }) }));
+        return (_jsx(SectionShell, { title: "Color Styles", subtitle: "Color styles extracted from the page, grouped by role.", theme: theme, copyLabel: "Copy Color", copied: copiedKey === "color", onCopy: () => void onCopy("color"), children: _jsx(ColorSection, { tokens: result.tokens, summary: summary, theme: theme }) }));
     }
     if (tab === "typography") {
         return (_jsx(SectionShell, { title: "Typography", subtitle: "Font families and text styles extracted from the page, ordered by size.", theme: theme, copyLabel: "Copy Typography", copied: copiedKey === "typography", onCopy: () => void onCopy("typography"), children: _jsx(TypographySection, { tokens: result.tokens, summary: summary, theme: theme }) }));
@@ -47,9 +47,9 @@ function OverviewSection({ summary, theme }) {
 function ColorSection({ tokens, summary, theme }) {
     const ui = getThemeClasses(theme);
     const groups = [
-        { label: "Fill", items: tokens.colors.filter((t) => t.role === "fill") },
-        { label: "Stroke", items: tokens.colors.filter((t) => t.role === "stroke") },
-        { label: "Text", items: tokens.colors.filter((t) => t.role === "text") }
+        { label: "Primary", items: summary.colorGroups.primary },
+        { label: "Neutral", items: summary.colorGroups.neutral },
+        { label: "Accent", items: summary.colorGroups.accent }
     ].filter((group) => group.items.length > 0);
     return (_jsxs("div", { className: "space-y-10", children: [groups.map((group) => (_jsxs("section", { className: "grid grid-cols-[88px_minmax(0,1fr)] gap-8", children: [_jsx("div", { className: `pt-3 text-sm font-medium ${ui.subtleText}`, children: group.label }), _jsx("div", { className: "grid gap-4 sm:grid-cols-2 xl:grid-cols-4", children: group.items.map((token) => (_jsxs("div", { className: `${ui.softPanel} overflow-hidden`, children: [_jsx("div", { className: `h-20 ${ui.rule}`, style: { backgroundColor: token.value } }), _jsxs("div", { className: "p-4", children: [_jsx("p", { className: `text-sm font-semibold ${ui.headingText}`, children: token.name }), _jsx("p", { className: `mt-1 text-xs ${ui.bodyText}`, children: token.value }), _jsx("p", { className: `mt-2 truncate text-[11px] ${ui.mutedText}`, children: token.source })] })] }, token.id))) })] }, group.label))), groups.length === 0 ? (_jsx(EmptyState, { message: "No clear color groups were found.", theme: theme })) : null] }));
 }
@@ -163,8 +163,7 @@ function ComponentsSection({ result, summary, theme }) {
                     if (baseCard.cornerRadius !== undefined)
                         cardSpecs.push({ label: "Corner", value: `${baseCard.cornerRadius}px` });
                     cardSpecs.push({ label: "Size", value: baseCard.variants.size });
-                    const cardCount = result.components.filter((c) => c.type === "Card").length;
-                    return (_jsxs("div", { className: `${ui.softPanel} p-5 md:col-span-2`, children: [_jsxs("div", { className: "flex items-start justify-between gap-3", children: [_jsx("p", { className: `text-sm font-semibold ${ui.headingText}`, children: "Card" }), _jsxs("span", { className: `text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: [cardCount, " ", cardCount === 1 ? "instance" : "instances"] })] }), _jsxs("div", { className: `mt-4 p-4 ${ui.previewPanel} space-y-5`, children: [_jsx("div", { className: "max-w-[220px]", children: _jsx(ComponentPreview, { component: baseCard, tokens: result.tokens, theme: theme, showSpecs: false }) }), cardSpecs.length > 0 && (_jsx("div", { className: `border-t pt-4 ${ui.rule} grid grid-cols-2 gap-x-8 gap-y-1.5`, children: cardSpecs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[64px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) }))] })] }));
+                    return (_jsxs("div", { className: `${ui.softPanel} p-5 md:col-span-2`, children: [_jsxs("div", { className: "flex items-start justify-between gap-3", children: [_jsx("p", { className: `text-sm font-semibold ${ui.headingText}`, children: "Card" }), _jsx("span", { className: `text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: baseCard.source })] }), _jsxs("div", { className: `mt-4 p-4 ${ui.previewPanel} space-y-5`, children: [_jsx("div", { className: "max-w-[220px]", children: _jsx(ComponentPreview, { component: baseCard, tokens: result.tokens, theme: theme, showSpecs: false }) }), cardSpecs.length > 0 && (_jsx("div", { className: `border-t pt-4 ${ui.rule} grid grid-cols-2 gap-x-8 gap-y-1.5`, children: cardSpecs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[64px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) }))] })] }));
                 })(), otherCurated.map((component) => (_jsxs("div", { className: `${ui.softPanel} p-5`, children: [_jsxs("div", { className: "flex items-start justify-between gap-3", children: [_jsxs("div", { children: [_jsx("p", { className: `text-sm font-semibold ${ui.headingText}`, children: component.type }), _jsxs("p", { className: `mt-1 text-xs ${ui.bodyText}`, children: [component.variants.style, " \u00B7 ", component.variants.size, " \u00B7 ", component.variants.state] })] }), _jsx("span", { className: `text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: component.name })] }), _jsx("div", { className: `mt-4 p-4 ${ui.previewPanel}`, children: _jsx(ComponentPreview, { component: component, tokens: result.tokens, theme: theme }) })] }, component.id))), buttonVariants.length === 0 && !baseCard && otherCurated.length === 0 ? _jsx(EmptyState, { message: "No curated component families were found.", theme: theme }) : null] }) }));
 }
 function ComponentPreview({ component, tokens, theme, showSpecs = true }) {
@@ -216,29 +215,29 @@ function ComponentPreview({ component, tokens, theme, showSpecs = true }) {
         return (_jsxs("div", { className: "space-y-4", children: [_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: "Button" }), showSpecs && specs.length > 0 && (_jsx("div", { className: "space-y-1.5", children: specs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[56px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) }))] }));
     }
     if (component.type === "Card") {
-        const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "16px";
+        const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "8px";
         const pad = component.padding ?? component.autoLayout?.padding;
         const specs = [];
-        if (type)
-            specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
         if (pad)
             specs.push({ label: "Padding", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
         if (component.cornerRadius !== undefined)
             specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+        if (type)
+            specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
         specs.push({ label: "Size", value: component.variants.size });
         const cardBg = fill ?? (theme === "light" ? "#ffffff" : "#1e293b");
         const cardBorder = stroke ?? (theme === "light" ? "#e2e8f0" : "#334155");
-        const imagePlaceholderColor = theme === "light" ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)";
         const cardTextColor = getReadableTextColor(cardBg, text, theme);
-        return (_jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "overflow-hidden border", style: {
+        return (_jsxs("div", { className: "space-y-4", children: [_jsx("div", { className: "border", style: {
                         backgroundColor: cardBg,
                         borderColor: cardBorder,
                         borderRadius,
                         color: cardTextColor,
-                        fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined
-                    }, children: [_jsx("div", { className: "h-28", style: { backgroundColor: imagePlaceholderColor } }), _jsxs("div", { style: pad
-                                ? { paddingTop: `${pad.top}px`, paddingRight: `${pad.right}px`, paddingBottom: `${pad.bottom}px`, paddingLeft: `${pad.left}px` }
-                                : { padding: "16px" }, children: [_jsx("p", { className: "text-sm font-semibold leading-snug", children: "Card title" }), _jsx("p", { className: "mt-1 text-xs leading-relaxed opacity-60", children: "Supporting body text for the card content." })] })] }), showSpecs && specs.length > 0 && (_jsx("div", { className: "space-y-1.5", children: specs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[64px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) }))] }));
+                        fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
+                        ...(pad
+                            ? { paddingTop: `${pad.top}px`, paddingRight: `${pad.right}px`, paddingBottom: `${pad.bottom}px`, paddingLeft: `${pad.left}px` }
+                            : { padding: "16px" })
+                    }, children: component.textContent ? (_jsx("p", { className: "text-sm font-semibold leading-snug", children: component.textContent })) : (_jsx("p", { className: `text-xs ${ui.mutedText}`, children: component.source })) }), showSpecs && specs.length > 0 && (_jsx("div", { className: "space-y-1.5", children: specs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[64px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) }))] }));
     }
     if (component.type === "Navigation") {
         return (_jsxs("div", { className: "flex items-center gap-4 rounded-full border px-5 py-3 text-sm", style: style, children: [_jsx("span", { children: "Overview" }), _jsx("span", { className: "opacity-60", children: "Pricing" }), _jsx("span", { className: "opacity-60", children: "Docs" })] }));
@@ -404,7 +403,7 @@ function getThemeClasses(theme) {
 function buildCopyText(key, summary, tokens) {
     const sections = {
         overview: buildOverviewCopy(summary),
-        color: buildColorCopy(tokens),
+        color: buildColorCopy(tokens, summary),
         typography: buildTypographyCopy(summary),
         layout: buildLayoutCopy(summary),
         components: buildComponentsCopy(summary)
@@ -436,15 +435,12 @@ function buildOverviewCopy(summary) {
         `- Main component families: ${summary.componentFamilies.slice(0, 3).map((family) => family.type).join(", ") || "Unknown"}`
     ].join("\n");
 }
-function buildColorCopy(tokens) {
-    const fills = tokens.colors.filter((t) => t.role === "fill");
-    const strokes = tokens.colors.filter((t) => t.role === "stroke");
-    const texts = tokens.colors.filter((t) => t.role === "text");
+function buildColorCopy(tokens, summary) {
     return [
         "Color",
-        ...fills.map((token) => `- Fill: ${token.value} (${token.source})`),
-        ...strokes.map((token) => `- Stroke: ${token.value} (${token.source})`),
-        ...texts.map((token) => `- Text: ${token.value} (${token.source})`)
+        ...summary.colorGroups.primary.map((token) => `- Primary: ${token.name} = ${token.value}`),
+        ...summary.colorGroups.neutral.map((token) => `- Neutral: ${token.name} = ${token.value}`),
+        ...summary.colorGroups.accent.map((token) => `- Accent: ${token.name} = ${token.value}`)
     ].join("\n");
 }
 function buildTypographyCopy(summary) {

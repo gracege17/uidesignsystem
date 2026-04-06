@@ -77,7 +77,7 @@ export default function DesignSystemReview({
       <SectionShell title="Overview" subtitle="Key extracted foundations and primary signals." theme={theme} copyLabel="Copy Everything" copied={copiedKey === "everything"} onCopy={() => void copySection("everything")}>
         <OverviewSection summary={summary} theme={theme} />
       </SectionShell>
-      <SectionShell title="Color Styles" subtitle="Colors extracted from the page, grouped by where they were found (fill, stroke, text)." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void copySection("color")}>
+      <SectionShell title="Color Styles" subtitle="Color styles extracted from the page, grouped by role." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void copySection("color")}>
         <ColorSection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
       <SectionShell title="Typography" subtitle="Font families and text styles extracted from the page, ordered by size." theme={theme} copyLabel="Copy Typography" copied={copiedKey === "typography"} onCopy={() => void copySection("typography")}>
@@ -118,7 +118,7 @@ function SplitSection({
 
   if (tab === "color") {
     return (
-      <SectionShell title="Color Styles" subtitle="Colors extracted from the page, grouped by where they were found (fill, stroke, text)." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void onCopy("color")}>
+      <SectionShell title="Color Styles" subtitle="Color styles extracted from the page, grouped by role." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void onCopy("color")}>
         <ColorSection tokens={result.tokens} summary={summary} theme={theme} />
       </SectionShell>
     );
@@ -207,9 +207,9 @@ function ColorSection({
 }) {
   const ui = getThemeClasses(theme);
   const groups = [
-    { label: "Fill", items: tokens.colors.filter((t) => t.role === "fill") },
-    { label: "Stroke", items: tokens.colors.filter((t) => t.role === "stroke") },
-    { label: "Text", items: tokens.colors.filter((t) => t.role === "text") }
+    { label: "Primary", items: summary.colorGroups.primary },
+    { label: "Neutral", items: summary.colorGroups.neutral },
+    { label: "Accent", items: summary.colorGroups.accent }
   ].filter((group) => group.items.length > 0);
 
   return (
@@ -548,12 +548,11 @@ function ComponentsSection({
         if (cardPad) cardSpecs.push({ label: "Padding", value: `${cardPad.top} · ${cardPad.right} · ${cardPad.bottom} · ${cardPad.left} px` });
         if (baseCard.cornerRadius !== undefined) cardSpecs.push({ label: "Corner", value: `${baseCard.cornerRadius}px` });
         cardSpecs.push({ label: "Size", value: baseCard.variants.size });
-        const cardCount = result.components.filter((c) => c.type === "Card").length;
         return (
           <div className={`${ui.softPanel} p-5 md:col-span-2`}>
             <div className="flex items-start justify-between gap-3">
               <p className={`text-sm font-semibold ${ui.headingText}`}>Card</p>
-              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{cardCount} {cardCount === 1 ? "instance" : "instances"}</span>
+              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{baseCard.source}</span>
             </div>
             <div className={`mt-4 p-4 ${ui.previewPanel} space-y-5`}>
               <div className="max-w-[220px]">
@@ -687,42 +686,38 @@ function ComponentPreview({
   }
 
   if (component.type === "Card") {
-    const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "16px";
+    const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "8px";
     const pad = component.padding ?? component.autoLayout?.padding;
     const specs: { label: string; value: string }[] = [];
-    if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
     if (pad) specs.push({ label: "Padding", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
     if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+    if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
     specs.push({ label: "Size", value: component.variants.size });
 
     const cardBg = fill ?? (theme === "light" ? "#ffffff" : "#1e293b");
     const cardBorder = stroke ?? (theme === "light" ? "#e2e8f0" : "#334155");
-    const imagePlaceholderColor = theme === "light" ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)";
     const cardTextColor = getReadableTextColor(cardBg, text, theme);
 
     return (
       <div className="space-y-4">
         <div
-          className="overflow-hidden border"
+          className="border"
           style={{
             backgroundColor: cardBg,
             borderColor: cardBorder,
             borderRadius,
             color: cardTextColor,
-            fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined
+            fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
+            ...(pad
+              ? { paddingTop: `${pad.top}px`, paddingRight: `${pad.right}px`, paddingBottom: `${pad.bottom}px`, paddingLeft: `${pad.left}px` }
+              : { padding: "16px" })
           }}
         >
-          <div className="h-28" style={{ backgroundColor: imagePlaceholderColor }} />
-          <div
-            style={
-              pad
-                ? { paddingTop: `${pad.top}px`, paddingRight: `${pad.right}px`, paddingBottom: `${pad.bottom}px`, paddingLeft: `${pad.left}px` }
-                : { padding: "16px" }
-            }
-          >
-            <p className="text-sm font-semibold leading-snug">Card title</p>
-            <p className="mt-1 text-xs leading-relaxed opacity-60">Supporting body text for the card content.</p>
-          </div>
+          {component.textContent ? (
+            <p className="text-sm font-semibold leading-snug">{component.textContent}</p>
+          ) : (
+            <p className={`text-xs ${ui.mutedText}`}>{component.source}</p>
+          )}
         </div>
         {showSpecs && specs.length > 0 && (
           <div className="space-y-1.5">
@@ -1016,7 +1011,7 @@ function getThemeClasses(theme: ThemeMode) {
 function buildCopyText(key: ReviewTab | "everything", summary: SummaryModel, tokens: DesignTokens) {
   const sections = {
     overview: buildOverviewCopy(summary),
-    color: buildColorCopy(tokens),
+    color: buildColorCopy(tokens, summary),
     typography: buildTypographyCopy(summary),
     layout: buildLayoutCopy(summary),
     components: buildComponentsCopy(summary)
@@ -1052,15 +1047,12 @@ function buildOverviewCopy(summary: SummaryModel) {
   ].join("\n");
 }
 
-function buildColorCopy(tokens: DesignTokens) {
-  const fills = tokens.colors.filter((t) => t.role === "fill");
-  const strokes = tokens.colors.filter((t) => t.role === "stroke");
-  const texts = tokens.colors.filter((t) => t.role === "text");
+function buildColorCopy(tokens: DesignTokens, summary: SummaryModel) {
   return [
     "Color",
-    ...fills.map((token) => `- Fill: ${token.value} (${token.source})`),
-    ...strokes.map((token) => `- Stroke: ${token.value} (${token.source})`),
-    ...texts.map((token) => `- Text: ${token.value} (${token.source})`)
+    ...summary.colorGroups.primary.map((token) => `- Primary: ${token.name} = ${token.value}`),
+    ...summary.colorGroups.neutral.map((token) => `- Neutral: ${token.name} = ${token.value}`),
+    ...summary.colorGroups.accent.map((token) => `- Accent: ${token.name} = ${token.value}`)
   ].join("\n");
 }
 
