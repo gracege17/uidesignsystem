@@ -85,19 +85,61 @@ function LayoutSection({ components, summary, theme }) {
 }
 function ComponentsSection({ result, summary, theme }) {
     const ui = getThemeClasses(theme);
-    const curated = summary.componentFamilies
-        .map((family) => result.components.find((component) => component.type === family.type))
-        .filter((component) => Boolean(component))
-        .slice(0, 6);
-    return (_jsx("div", { className: "space-y-6", children: _jsxs("div", { className: "grid gap-6 md:grid-cols-2", children: [curated.map((component) => (_jsxs("div", { className: `${ui.softPanel} p-5`, children: [_jsxs("div", { className: "flex items-start justify-between gap-3", children: [_jsxs("div", { children: [_jsx("p", { className: `text-sm font-semibold ${ui.headingText}`, children: component.type }), _jsxs("p", { className: `mt-1 text-xs ${ui.bodyText}`, children: [component.variants.style, " \u00B7 ", component.variants.size, " \u00B7 ", component.variants.state] })] }), _jsx("span", { className: `text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: component.name })] }), _jsx("div", { className: `mt-4 p-4 ${ui.previewPanel}`, children: _jsx(ComponentPreview, { component: component, tokens: result.tokens, theme: theme }) })] }, component.id))), curated.length === 0 ? _jsx(EmptyState, { message: "No curated component families were found.", theme: theme }) : null] }) }));
+    const STYLE_PRIORITY = { fill: 0, outline: 1, ghost: 2 };
+    const BUTTON_STYLES = ["fill", "outline", "ghost"];
+    // Prefer default-state fill button as the base; fall back to any button
+    const baseButton = result.components.find((c) => c.type === "Button" && c.variants.style === "fill" && c.variants.state === "default") ?? result.components.find((c) => c.type === "Button");
+    // For each style, use a real extracted button if available; otherwise synthesize from base
+    const buttonVariants = baseButton
+        ? BUTTON_STYLES.map((style) => {
+            const real = result.components.find((c) => c.type === "Button" &&
+                c.variants.style === style &&
+                c.variants.state === "default");
+            if (real)
+                return { component: real, synthesized: false };
+            return {
+                component: {
+                    ...baseButton,
+                    id: `${baseButton.id}-${style}`,
+                    variants: { ...baseButton.variants, style }
+                },
+                synthesized: true
+            };
+        })
+        : [];
+    // For non-Button families, pick the best fill representative
+    const otherCurated = summary.componentFamilies
+        .filter((family) => family.type !== "Button")
+        .map((family) => {
+        const matches = result.components.filter((c) => c.type === family.type);
+        return matches.sort((a, b) => (STYLE_PRIORITY[a.variants.style] ?? 9) - (STYLE_PRIORITY[b.variants.style] ?? 9))[0];
+    })
+        .filter((c) => Boolean(c))
+        .slice(0, 5);
+    return (_jsx("div", { className: "space-y-6", children: _jsxs("div", { className: "grid gap-6 md:grid-cols-2", children: [buttonVariants.length > 0 && (() => {
+                    const fillEntry = buttonVariants.find((v) => v.component.variants.style === "fill");
+                    const fillComponent = fillEntry?.component ?? buttonVariants[0].component;
+                    const fillType = result.tokens.typography.find((t) => fillComponent.tokens.typography.includes(t.id));
+                    const fillPad = fillComponent.padding ?? fillComponent.autoLayout?.padding;
+                    const specs = [];
+                    if (fillType)
+                        specs.push({ label: "Font", value: `${fillType.fontFamily} · ${fillType.fontSize}px · ${fillType.fontWeight}` });
+                    if (fillPad)
+                        specs.push({ label: "Space", value: `${fillPad.top} · ${fillPad.right} · ${fillPad.bottom} · ${fillPad.left} px` });
+                    if (fillComponent.cornerRadius !== undefined)
+                        specs.push({ label: "Corner", value: `${fillComponent.cornerRadius}px` });
+                    specs.push({ label: "Size", value: fillComponent.variants.size });
+                    return (_jsxs("div", { className: `${ui.softPanel} p-5 md:col-span-2`, children: [_jsxs("div", { className: "flex items-start justify-between gap-3", children: [_jsx("p", { className: `text-sm font-semibold ${ui.headingText}`, children: "Button" }), _jsx("span", { className: `text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: "3 variants" })] }), _jsxs("div", { className: `mt-4 p-4 ${ui.previewPanel} space-y-5`, children: [_jsx("div", { className: "flex flex-wrap items-center gap-8", children: buttonVariants.map(({ component, synthesized }) => (_jsxs("div", { className: "flex flex-col items-center gap-2", children: [_jsx(ComponentPreview, { component: component, tokens: result.tokens, theme: theme, showSpecs: false }), _jsxs("p", { className: `text-[10px] capitalize ${ui.mutedText}`, children: [component.variants.style, synthesized ? " *" : ""] })] }, component.id))) }), specs.length > 0 && (_jsx("div", { className: `border-t pt-4 ${ui.rule} grid grid-cols-2 gap-x-8 gap-y-1.5`, children: specs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[56px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) }))] })] }));
+                })(), otherCurated.map((component) => (_jsxs("div", { className: `${ui.softPanel} p-5`, children: [_jsxs("div", { className: "flex items-start justify-between gap-3", children: [_jsxs("div", { children: [_jsx("p", { className: `text-sm font-semibold ${ui.headingText}`, children: component.type }), _jsxs("p", { className: `mt-1 text-xs ${ui.bodyText}`, children: [component.variants.style, " \u00B7 ", component.variants.size, " \u00B7 ", component.variants.state] })] }), _jsx("span", { className: `text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`, children: component.name })] }), _jsx("div", { className: `mt-4 p-4 ${ui.previewPanel}`, children: _jsx(ComponentPreview, { component: component, tokens: result.tokens, theme: theme }) })] }, component.id))), buttonVariants.length === 0 && otherCurated.length === 0 ? _jsx(EmptyState, { message: "No curated component families were found.", theme: theme }) : null] }) }));
 }
-function ComponentPreview({ component, tokens, theme }) {
+function ComponentPreview({ component, tokens, theme, showSpecs = true }) {
     const ui = getThemeClasses(theme);
     const fill = tokens.colors.find((token) => component.tokens.fills.includes(token.id))?.value;
     const stroke = tokens.colors.find((token) => component.tokens.strokes.includes(token.id))?.value;
     const text = tokens.colors.find((token) => component.tokens.text.includes(token.id))?.value;
     const type = tokens.typography.find((token) => component.tokens.typography.includes(token.id));
     const variantStyle = component.variants.style;
+    // For fill buttons with no captured background, fall back to the primary brand color
     const primaryBrandColor = tokens.colors.find((t) => t.role === "fill" && !isNeutralColor(t.value))?.value;
     const resolvedBackground = variantStyle === "outline" || variantStyle === "ghost"
         ? "transparent"
@@ -127,8 +169,6 @@ function ComponentPreview({ component, tokens, theme }) {
     };
     if (component.type === "Button" || component.type === "Badge") {
         const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
-        const rawText = component.textContent ?? "";
-        const label = rawText.length > 0 && rawText.length <= 30 ? rawText : component.type;
         const pad = component.padding ?? component.autoLayout?.padding;
         const specs = [];
         if (type)
@@ -138,7 +178,7 @@ function ComponentPreview({ component, tokens, theme }) {
         if (component.cornerRadius !== undefined)
             specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
         specs.push({ label: "Size", value: component.variants.size });
-        return (_jsxs("div", { className: "space-y-4", children: [_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: label }), specs.length > 0 && (_jsx("div", { className: "space-y-1.5", children: specs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[56px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) }))] }));
+        return (_jsxs("div", { className: "space-y-4", children: [_jsx("button", { type: "button", className: `w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`, style: { ...style, borderRadius }, children: "Button" }), showSpecs && specs.length > 0 && (_jsx("div", { className: "space-y-1.5", children: specs.map((spec) => (_jsxs("div", { className: "grid grid-cols-[56px_1fr] gap-3 text-xs", children: [_jsx("span", { className: `font-medium ${ui.mutedText}`, children: spec.label }), _jsx("span", { className: ui.bodyText, children: spec.value })] }, spec.label))) }))] }));
     }
     if (component.type === "Navigation") {
         return (_jsxs("div", { className: "flex items-center gap-4 rounded-full border px-5 py-3 text-sm", style: style, children: [_jsx("span", { children: "Overview" }), _jsx("span", { className: "opacity-60", children: "Pricing" }), _jsx("span", { className: "opacity-60", children: "Docs" })] }));

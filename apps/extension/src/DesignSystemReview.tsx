@@ -369,15 +369,97 @@ function ComponentsSection({
   theme: ThemeMode;
 }) {
   const ui = getThemeClasses(theme);
-  const curated = summary.componentFamilies
-    .map((family) => result.components.find((component) => component.type === family.type))
-    .filter((component): component is ExtractedComponent => Boolean(component))
-    .slice(0, 6);
+  const STYLE_PRIORITY: Record<string, number> = { fill: 0, outline: 1, ghost: 2 };
+  const BUTTON_STYLES = ["fill", "outline", "ghost"] as const;
+
+  // Prefer default-state fill button as the base; fall back to any button
+  const baseButton =
+    result.components.find(
+      (c) => c.type === "Button" && c.variants.style === "fill" && c.variants.state === "default"
+    ) ?? result.components.find((c) => c.type === "Button");
+
+  // For each style, use a real extracted button if available; otherwise synthesize from base
+  const buttonVariants: Array<{ component: ExtractedComponent; synthesized: boolean }> =
+    baseButton
+      ? BUTTON_STYLES.map((style) => {
+          const real = result.components.find(
+            (c) =>
+              c.type === "Button" &&
+              c.variants.style === style &&
+              c.variants.state === "default"
+          );
+          if (real) return { component: real, synthesized: false };
+          return {
+            component: {
+              ...baseButton,
+              id: `${baseButton.id}-${style}`,
+              variants: { ...baseButton.variants, style }
+            },
+            synthesized: true
+          };
+        })
+      : [];
+
+  // For non-Button families, pick the best fill representative
+  const otherCurated = summary.componentFamilies
+    .filter((family) => family.type !== "Button")
+    .map((family) => {
+      const matches = result.components.filter((c) => c.type === family.type);
+      return matches.sort(
+        (a, b) =>
+          (STYLE_PRIORITY[a.variants.style] ?? 9) - (STYLE_PRIORITY[b.variants.style] ?? 9)
+      )[0];
+    })
+    .filter((c): c is ExtractedComponent => Boolean(c))
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
-      {curated.map((component) => (
+
+      {buttonVariants.length > 0 && (() => {
+        const fillEntry = buttonVariants.find((v) => v.component.variants.style === "fill");
+        const fillComponent = fillEntry?.component ?? buttonVariants[0].component;
+        const fillType = result.tokens.typography.find((t) => fillComponent.tokens.typography.includes(t.id));
+        const fillPad = fillComponent.padding ?? fillComponent.autoLayout?.padding;
+        const specs: { label: string; value: string }[] = [];
+        if (fillType) specs.push({ label: "Font", value: `${fillType.fontFamily} · ${fillType.fontSize}px · ${fillType.fontWeight}` });
+        if (fillPad) specs.push({ label: "Space", value: `${fillPad.top} · ${fillPad.right} · ${fillPad.bottom} · ${fillPad.left} px` });
+        if (fillComponent.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${fillComponent.cornerRadius}px` });
+        specs.push({ label: "Size", value: fillComponent.variants.size });
+        return (
+          <div className={`${ui.softPanel} p-5 md:col-span-2`}>
+            <div className="flex items-start justify-between gap-3">
+              <p className={`text-sm font-semibold ${ui.headingText}`}>Button</p>
+              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>3 variants</span>
+            </div>
+            <div className={`mt-4 p-4 ${ui.previewPanel} space-y-5`}>
+              <div className="flex flex-wrap items-center gap-8">
+                {buttonVariants.map(({ component, synthesized }) => (
+                  <div key={component.id} className="flex flex-col items-center gap-2">
+                    <ComponentPreview component={component} tokens={result.tokens} theme={theme} showSpecs={false} />
+                    <p className={`text-[10px] capitalize ${ui.mutedText}`}>
+                      {component.variants.style}{synthesized ? " *" : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {specs.length > 0 && (
+                <div className={`border-t pt-4 ${ui.rule} grid grid-cols-2 gap-x-8 gap-y-1.5`}>
+                  {specs.map((spec) => (
+                    <div key={spec.label} className="grid grid-cols-[56px_1fr] gap-3 text-xs">
+                      <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
+                      <span className={ui.bodyText}>{spec.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {otherCurated.map((component) => (
         <div key={component.id} className={`${ui.softPanel} p-5`}>
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -395,7 +477,7 @@ function ComponentsSection({
         </div>
       ))}
 
-      {curated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
+      {buttonVariants.length === 0 && otherCurated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
       </div>
     </div>
   );
@@ -404,11 +486,13 @@ function ComponentsSection({
 function ComponentPreview({
   component,
   tokens,
-  theme
+  theme,
+  showSpecs = true
 }: {
   component: ExtractedComponent;
   tokens: DesignTokens;
   theme: ThemeMode;
+  showSpecs?: boolean;
 }) {
   const ui = getThemeClasses(theme);
   const fill = tokens.colors.find((token) => component.tokens.fills.includes(token.id))?.value;
@@ -458,8 +542,6 @@ function ComponentPreview({
 
   if (component.type === "Button" || component.type === "Badge") {
     const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
-    const rawText = component.textContent ?? "";
-    const label = rawText.length > 0 && rawText.length <= 30 ? rawText : component.type;
     const pad = component.padding ?? component.autoLayout?.padding;
     const specs: { label: string; value: string }[] = [];
     if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
@@ -473,9 +555,9 @@ function ComponentPreview({
           className={`w-fit ${variantStyle === "ghost" ? "border-0" : "border"}`}
           style={{ ...style, borderRadius }}
         >
-          {label}
+          Button
         </button>
-        {specs.length > 0 && (
+        {showSpecs && specs.length > 0 && (
           <div className="space-y-1.5">
             {specs.map((spec) => (
               <div key={spec.label} className="grid grid-cols-[56px_1fr] gap-3 text-xs">

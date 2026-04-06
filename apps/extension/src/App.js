@@ -56,6 +56,8 @@ function captureSerializedStylesFromDocument() {
             return `${tagName}#${element.id}`;
         }
         const classes = Array.from(element.classList);
+        // Prefer semantic class names (CSS modules, BEM) over obfuscated short ones.
+        // Semantic classes tend to be longer and contain underscores or capital letters.
         const semantic = classes.find((c) => c.length > 6 && /[_A-Z]/.test(c));
         const picked = semantic ? [semantic, ...classes.filter((c) => c !== semantic).slice(0, 1)] : classes.slice(0, 2);
         const className = picked.join(".");
@@ -133,6 +135,8 @@ function captureSerializedStylesFromDocument() {
             (!hasVisibleArea && !hasText)) {
             return null;
         }
+        // If the element itself is transparent, check direct children for the real fill.
+        // Buttons on sites like Gusto apply background via a child wrapper or pseudo-element.
         let backgroundColor = style.backgroundColor;
         if ((backgroundColor === "rgba(0, 0, 0, 0)" || backgroundColor === "transparent") && element.children.length > 0) {
             for (const child of Array.from(element.children).slice(0, 3)) {
@@ -163,10 +167,28 @@ function captureSerializedStylesFromDocument() {
             height: parsePx(String(rect.height)),
             display: style.display,
             gap: parsePx(style.gap),
-            paddingTop: parsePx(style.paddingTop) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0]).paddingTop) : undefined),
-            paddingRight: parsePx(style.paddingRight) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0]).paddingRight) : undefined),
-            paddingBottom: parsePx(style.paddingBottom) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0]).paddingBottom) : undefined),
-            paddingLeft: parsePx(style.paddingLeft) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0]).paddingLeft) : undefined),
+            // Read padding from the element itself. If every side is zero, fall back to the first
+            // child — button label spans often carry the real padding (e.g. Gusto-style wrappers).
+            // We use a single source (self or child) so we never mix values from both.
+            ...(() => {
+                const pt = parsePx(style.paddingTop) ?? 0;
+                const pr = parsePx(style.paddingRight) ?? 0;
+                const pb = parsePx(style.paddingBottom) ?? 0;
+                const pl = parsePx(style.paddingLeft) ?? 0;
+                if (pt + pr + pb + pl > 0) {
+                    return { paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl };
+                }
+                const firstChild = element.children[0];
+                if (!firstChild)
+                    return { paddingTop: undefined, paddingRight: undefined, paddingBottom: undefined, paddingLeft: undefined };
+                const cs = window.getComputedStyle(firstChild);
+                return {
+                    paddingTop: parsePx(cs.paddingTop),
+                    paddingRight: parsePx(cs.paddingRight),
+                    paddingBottom: parsePx(cs.paddingBottom),
+                    paddingLeft: parsePx(cs.paddingLeft)
+                };
+            })(),
             justifyContent: style.justifyContent,
             alignItems: style.alignItems,
             flexWrap: style.flexWrap,

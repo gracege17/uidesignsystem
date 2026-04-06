@@ -293,11 +293,27 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         height: parsePx(String(rect.height)),
         display: style.display,
         gap: parsePx(style.gap),
-        // If element has no padding, check its first child (button label spans often carry the padding).
-        paddingTop: parsePx(style.paddingTop) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0] as HTMLElement).paddingTop) : undefined),
-        paddingRight: parsePx(style.paddingRight) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0] as HTMLElement).paddingRight) : undefined),
-        paddingBottom: parsePx(style.paddingBottom) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0] as HTMLElement).paddingBottom) : undefined),
-        paddingLeft: parsePx(style.paddingLeft) || (element.children[0] ? parsePx(window.getComputedStyle(element.children[0] as HTMLElement).paddingLeft) : undefined),
+        // Read padding from the element itself. If every side is zero, fall back to the first
+        // child — button label spans often carry the real padding (e.g. Gusto-style wrappers).
+        // We use a single source (self or child) so we never mix values from both.
+        ...(() => {
+          const pt = parsePx(style.paddingTop) ?? 0;
+          const pr = parsePx(style.paddingRight) ?? 0;
+          const pb = parsePx(style.paddingBottom) ?? 0;
+          const pl = parsePx(style.paddingLeft) ?? 0;
+          if (pt + pr + pb + pl > 0) {
+            return { paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl };
+          }
+          const firstChild = element.children[0] as HTMLElement | undefined;
+          if (!firstChild) return { paddingTop: undefined, paddingRight: undefined, paddingBottom: undefined, paddingLeft: undefined };
+          const cs = window.getComputedStyle(firstChild);
+          return {
+            paddingTop: parsePx(cs.paddingTop),
+            paddingRight: parsePx(cs.paddingRight),
+            paddingBottom: parsePx(cs.paddingBottom),
+            paddingLeft: parsePx(cs.paddingLeft)
+          };
+        })(),
         justifyContent: style.justifyContent,
         alignItems: style.alignItems,
         flexWrap: style.flexWrap,
