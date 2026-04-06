@@ -1,125 +1,9 @@
-import { useState } from "react";
-import { extractDesignSystem, type SerializedStyleNode } from "@extractor/parser";
-import type { ExtractionResult } from "@extractor/types";
-import DesignSystemReview from "./DesignSystemReview";
-import { getExtensionApi, openReviewPage, saveReviewResult } from "./review-data";
+import type { SerializedStyleNode } from "@extractor/parser";
+import { getExtensionApi } from "../storage/review-data";
 
 const browserApi = getExtensionApi();
 
-export default function App() {
-  const [result, setResult] = useState<ExtractionResult | null>(null);
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [view, setView] = useState<"review" | "raw">("review");
-
-  const handleExtract = async () => {
-    setIsExtracting(true);
-    setErrorMessage(null);
-
-    try {
-      const nodes = await captureSerializedStyles();
-      const nextResult = extractDesignSystem(nodes);
-      await saveReviewResult(nextResult);
-      setResult(nextResult);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Extraction failed.");
-      setResult(null);
-    } finally {
-      setIsExtracting(false);
-    }
-  };
-
-  return (
-    <main className="min-h-screen bg-panel-grid bg-[size:24px_24px] p-5 text-slate-100">
-      <section className="mx-auto flex min-h-[520px] max-w-md flex-col rounded-[28px] border border-white/10 bg-slate-900/80 p-6 shadow-panel backdrop-blur">
-        <div className="mb-8">
-          <p className="mb-3 inline-flex rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-brand-100">
-            Manifest V3
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight text-white">
-            Design System Extractor
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-slate-300">
-            Run a token extraction pass against the active page and inspect the
-            shared parser output directly in the popup.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleExtract}
-          disabled={isExtracting}
-          className="inline-flex items-center justify-center rounded-2xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:ring-offset-2 focus:ring-offset-slate-900"
-        >
-          {isExtracting ? "Extracting..." : "Extract"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => void openReviewPage()}
-          disabled={!result}
-          className="mt-3 inline-flex items-center justify-center rounded-2xl border border-white/15 bg-slate-900/80 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-white/30 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Open Review Page
-        </button>
-
-        <div className="mt-6 flex-1 rounded-2xl border border-white/10 bg-slate-950/80 p-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-white">Extraction Preview</h2>
-              <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-slate-400">
-                active tab
-              </p>
-            </div>
-
-            <div className="inline-flex rounded-full border border-white/10 bg-slate-900/80 p-1 text-xs">
-              <button
-                type="button"
-                onClick={() => setView("review")}
-                className={`rounded-full px-3 py-1.5 transition ${
-                  view === "review"
-                    ? "bg-white text-slate-950"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                Review
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("raw")}
-                className={`rounded-full px-3 py-1.5 transition ${
-                  view === "raw" ? "bg-white text-slate-950" : "text-slate-300 hover:text-white"
-                }`}
-              >
-                Raw
-              </button>
-            </div>
-          </div>
-
-          {errorMessage ? (
-            <p className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm leading-6 text-rose-100">
-              {errorMessage}
-            </p>
-          ) : result ? (
-            view === "review" ? (
-              <DesignSystemReview result={result} layout="stacked" />
-            ) : (
-              <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-white/10 bg-slate-900/70 p-4 text-xs leading-6 text-slate-300">
-                {JSON.stringify(result, null, 2)}
-              </pre>
-            )
-          ) : (
-            <p className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 text-sm leading-6 text-slate-300">
-              Click Extract to scan the active tab and review tokens plus inferred components.
-            </p>
-          )}
-        </div>
-      </section>
-    </main>
-  );
-}
-
-async function captureSerializedStyles(): Promise<SerializedStyleNode[]> {
+export async function captureSerializedStyles(): Promise<SerializedStyleNode[]> {
   if (!browserApi?.tabs?.query || !browserApi?.scripting) {
     return captureSerializedStylesFromDocument();
   }
@@ -152,13 +36,14 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
     }
 
     const classes = Array.from(element.classList);
-    // A hashed class looks like "abc_XyZ3a" or "gwb_S-Ue6" — a short prefix, underscore,
-    // then a base64/hash segment. Filter these out before picking a semantic name.
-    const isHashed = (c: string) => /^[a-z]{2,6}_[A-Za-z0-9\-]{3,}$/.test(c);
-    const readable = classes.filter((c) => !isHashed(c));
+    // Filter hashed class names before trying to infer a semantic source.
+    const isHashed = (className: string) => /^[a-z]{2,6}_[A-Za-z0-9\-]{3,}$/.test(className);
+    const readable = classes.filter((className) => !isHashed(className));
     const pool = readable.length > 0 ? readable : classes;
-    const semantic = pool.find((c) => c.length > 6 && /[_A-Z-]/.test(c));
-    const picked = semantic ? [semantic, ...pool.filter((c) => c !== semantic).slice(0, 1)] : pool.slice(0, 2);
+    const semantic = pool.find((className) => className.length > 6 && /[_A-Z-]/.test(className));
+    const picked = semantic
+      ? [semantic, ...pool.filter((className) => className !== semantic).slice(0, 1)]
+      : pool.slice(0, 2);
     const className = picked.join(".");
     return className ? `${tagName}.${className}` : tagName;
   };
@@ -265,10 +150,11 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         return null;
       }
 
-      // If the element itself is transparent, check direct children for the real fill.
-      // Buttons on sites like Gusto apply background via a child wrapper or pseudo-element.
       let backgroundColor = style.backgroundColor;
-      if ((backgroundColor === "rgba(0, 0, 0, 0)" || backgroundColor === "transparent") && element.children.length > 0) {
+      if (
+        (backgroundColor === "rgba(0, 0, 0, 0)" || backgroundColor === "transparent") &&
+        element.children.length > 0
+      ) {
         for (const child of Array.from(element.children).slice(0, 3)) {
           const childBg = window.getComputedStyle(child as HTMLElement).backgroundColor;
           if (childBg !== "rgba(0, 0, 0, 0)" && childBg !== "transparent") {
@@ -277,6 +163,7 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
           }
         }
       }
+
       const borderColor =
         style.borderStyle !== "none" &&
         (parseFloat(style.borderTopWidth) > 0 || parseFloat(style.borderRightWidth) > 0)
@@ -299,27 +186,27 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         width: parsePx(String(rect.width)),
         height: parsePx(String(rect.height)),
         display: style.display,
-        // If element has no gap, scan ALL direct children for a flex/grid container
-        // with a real gap. Nav wrappers often have logo in children[0] (gap:0) and
-        // the actual item list in a later sibling — first-child-only check misses it.
         gap: (() => {
           const selfGap = parsePx(style.gap);
           if (selfGap) return selfGap;
+
           let best = 0;
           for (const child of Array.from(element.children).slice(0, 8)) {
-            const cs = window.getComputedStyle(child as HTMLElement);
-            if (cs.display === "flex" || cs.display === "inline-flex" || cs.display === "grid") {
-              const g = parsePx(cs.gap) ?? 0;
-              if (g > best) best = g;
+            const childStyles = window.getComputedStyle(child as HTMLElement);
+            if (
+              childStyles.display === "flex" ||
+              childStyles.display === "inline-flex" ||
+              childStyles.display === "grid"
+            ) {
+              const gap = parsePx(childStyles.gap) ?? 0;
+              if (gap > best) best = gap;
             }
           }
+
           return best > 0 ? best : undefined;
         })(),
         gridTemplateColumns: style.display === "grid" ? style.gridTemplateColumns : undefined,
         maxWidth: style.maxWidth !== "none" ? parsePx(style.maxWidth) : undefined,
-        // Read padding from the element itself. If every side is zero, fall back to the first
-        // child — button label spans often carry the real padding (e.g. Gusto-style wrappers).
-        // We use a single source (self or child) so we never mix values from both.
         ...(() => {
           const pt = parsePx(style.paddingTop) ?? 0;
           const pr = parsePx(style.paddingRight) ?? 0;
@@ -328,14 +215,23 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
           if (pt + pr + pb + pl > 0) {
             return { paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl };
           }
+
           const firstChild = element.children[0] as HTMLElement | undefined;
-          if (!firstChild) return { paddingTop: undefined, paddingRight: undefined, paddingBottom: undefined, paddingLeft: undefined };
-          const cs = window.getComputedStyle(firstChild);
+          if (!firstChild) {
+            return {
+              paddingTop: undefined,
+              paddingRight: undefined,
+              paddingBottom: undefined,
+              paddingLeft: undefined
+            };
+          }
+
+          const childStyles = window.getComputedStyle(firstChild);
           return {
-            paddingTop: parsePx(cs.paddingTop),
-            paddingRight: parsePx(cs.paddingRight),
-            paddingBottom: parsePx(cs.paddingBottom),
-            paddingLeft: parsePx(cs.paddingLeft)
+            paddingTop: parsePx(childStyles.paddingTop),
+            paddingRight: parsePx(childStyles.paddingRight),
+            paddingBottom: parsePx(childStyles.paddingBottom),
+            paddingLeft: parsePx(childStyles.paddingLeft)
           };
         })(),
         justifyContent: style.justifyContent,
@@ -343,7 +239,9 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         flexWrap: style.flexWrap,
         borderRadius: parsePx(style.borderRadius),
         role: element.getAttribute("role") ?? undefined,
-        ariaExpanded: element.hasAttribute("aria-expanded") ? element.getAttribute("aria-expanded") === "true" : undefined,
+        ariaExpanded: element.hasAttribute("aria-expanded")
+          ? element.getAttribute("aria-expanded") === "true"
+          : undefined,
         href: element instanceof HTMLAnchorElement ? element.href : undefined,
         inputType:
           element instanceof HTMLInputElement

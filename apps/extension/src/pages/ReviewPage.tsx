@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ExtractionResult } from "@extractor/types";
-import DesignSystemReview from "./DesignSystemReview";
-import { loadReviewResult } from "./review-data";
+import DesignSystemReview from "../features/review/DesignSystemReview";
+import { loadReviewResult } from "../features/storage/review-data";
 
 export default function ReviewPage() {
   const [result, setResult] = useState<ExtractionResult | null>(null);

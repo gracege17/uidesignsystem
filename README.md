@@ -33,7 +33,19 @@ Each section also supports copy actions for curated summaries.
 
 ```text
 apps/extension
-  Chrome extension UI, popup, review page, and tab capture logic
+  Chrome extension app
+  src/entrypoints
+    Vite entry files for popup and review surfaces
+  src/pages
+    Top-level popup and review page shells
+  src/features/extraction
+    DOM capture and style serialization
+  src/features/review
+    Review UI and section rendering
+  src/features/storage
+    Chrome/local storage helpers for review state
+  src/styles
+    Shared extension styles
 
 packages/parser
   Token and component extraction logic
