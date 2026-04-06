@@ -75,7 +75,7 @@ export default function DesignSystemReview({
   return (
     <div className="space-y-12">
       <SectionShell title="Overview" subtitle="Key extracted foundations and primary signals." theme={theme} copyLabel="Copy Everything" copied={copiedKey === "everything"} onCopy={() => void copySection("everything")}>
-        <OverviewSection summary={summary} theme={theme} />
+        <OverviewSection result={result} summary={summary} theme={theme} />
       </SectionShell>
       <SectionShell title="Color Styles" subtitle="Color styles extracted from the page, grouped by role." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void copySection("color")}>
         <ColorSection tokens={result.tokens} summary={summary} theme={theme} />
@@ -111,7 +111,7 @@ function SplitSection({
   if (tab === "overview") {
     return (
       <SectionShell title="Overview" subtitle="Start here to identify the main design-system signals." theme={theme} copyLabel="Copy Everything" copied={copiedKey === "everything"} onCopy={() => void onCopy("everything")}>
-        <OverviewSection summary={summary} theme={theme} />
+        <OverviewSection result={result} summary={summary} theme={theme} />
       </SectionShell>
     );
   }
@@ -148,50 +148,115 @@ function SplitSection({
 }
 
 function OverviewSection({
+  result,
   summary,
   theme
 }: {
+  result: ExtractionResult;
   summary: SummaryModel;
   theme: ThemeMode;
 }) {
   const ui = getThemeClasses(theme);
 
+  // Primary brand color — first non-neutral fill token
+  const brandColor = summary.primaryColor;
+
+  // Primary font — most common font family
+  const primaryFont = summary.fontFamilies[0];
+  const bodyStyle = summary.body;
+
+  // Primary fill button
+  const primaryButton = result.components.find(
+    (c) => c.type === "Button" && c.variants.style === "fill" && c.variants.state === "default"
+  );
+
+  // One-line summary sentence
+  const summaryParts: string[] = [];
+  if (primaryFont) summaryParts.push(primaryFont.split(",")[0].trim());
+  if (brandColor) summaryParts.push(brandColor.value);
+  if (result.layout.contentWidth) summaryParts.push(`${result.layout.contentWidth}px canvas`);
+  if (result.layout.spacingScale[0]) summaryParts.push(`${result.layout.spacingScale[0]}px base grid`);
+
   return (
-    <div className="space-y-8">
-      <div className={`border-t pt-8 ${ui.rule}`}>
-        <div className="grid gap-4 md:grid-cols-3">
-          <OverviewCard label="Primary Color" value={summary.primaryColor?.name ?? "Not found"} detail={summary.primaryColor?.value ?? "No dominant color yet"} theme={theme} />
-          <OverviewCard
-            label={summary.fontFamilies.length > 1 ? "Typefaces" : "Typeface"}
-            value={summary.fontFamilies.length > 0 ? summary.fontFamilies.join(" / ") : "Not found"}
-            detail={summary.fontFamilies.length > 1 ? "Paired typeface system" : (summary.mainTypography ? `${summary.mainTypography.fontSize}px / ${summary.mainTypography.lineHeight}px` : "No dominant text style yet")}
-            theme={theme}
+    <div className="space-y-6">
+
+      {/* 4 visual tiles */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+
+        {/* Brand color */}
+        <div className={`${ui.softPanel} overflow-hidden`}>
+          <div
+            className="h-20 w-full"
+            style={{ backgroundColor: brandColor?.value ?? "#e2e8f0" }}
           />
-          <OverviewCard label="Top Family" value={summary.componentFamilies[0]?.type ?? "Not found"} detail={summary.componentFamilies[0] ? `${summary.componentFamilies[0].count} instances` : "No repeated family yet"} theme={theme} />
-        </div>
-      </div>
-
-      <div className={`grid gap-4 md:grid-cols-2`}>
-        <div className={`p-6 ${ui.softPanel}`}>
-          <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.mutedText}`}>Designer Questions</p>
-          <div className={`mt-4 space-y-3 text-sm ${ui.bodyText}`}>
-            <p>Most common fill: <span className={ui.strongText}>{summary.primaryColor?.value ?? "Unknown"}</span></p>
-            <p>Largest text: <span className={ui.strongText}>{summary.h1 ? `${summary.h1.fontFamily} ${summary.h1.fontSize}px / ${summary.h1.fontWeight}` : "Unknown"}</span></p>
-            <p>Body range: <span className={ui.strongText}>{summary.body ? `${summary.body.fontFamily} ${summary.body.fontSize}px / ${summary.body.fontWeight}` : "Unknown"}</span></p>
-            <p>Main component families: <span className={ui.strongText}>{summary.componentFamilies.slice(0, 3).map((family) => family.type).join(", ") || "Unknown"}</span></p>
+          <div className="p-3">
+            <p className={`text-[10px] uppercase tracking-[0.18em] ${ui.mutedText}`}>Brand color</p>
+            <p className={`mt-1 text-xs font-semibold ${ui.headingText}`}>{brandColor?.value ?? "—"}</p>
           </div>
         </div>
 
-        <div className={`p-6 ${ui.softPanel}`}>
-          <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.mutedText}`}>System Snapshot</p>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <MiniMetric label="Colors" value={summary.counts.colors} theme={theme} />
-            <MiniMetric label="Typography" value={summary.counts.typography} theme={theme} />
-            <MiniMetric label="Layouts" value={summary.counts.layouts} theme={theme} />
-            <MiniMetric label="Components" value={summary.counts.components} theme={theme} />
+        {/* Typeface */}
+        <div className={`${ui.softPanel} p-4 flex flex-col justify-between`}>
+          <p className={`text-[10px] uppercase tracking-[0.18em] ${ui.mutedText}`}>Typeface</p>
+          <div>
+            <p
+              className={`mt-2 text-4xl font-bold leading-none ${ui.headingText}`}
+              style={{ fontFamily: primaryFont ? `"${primaryFont}", sans-serif` : undefined }}
+            >
+              Aa
+            </p>
+            <p className={`mt-2 text-xs font-semibold ${ui.headingText}`}>
+              {primaryFont?.split(",")[0].trim() ?? "—"}
+            </p>
+            {bodyStyle && (
+              <p className={`text-[11px] ${ui.mutedText}`}>{bodyStyle.fontSize}px / {bodyStyle.fontWeight}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Primary button */}
+        <div className={`${ui.softPanel} p-4 flex flex-col justify-between`}>
+          <p className={`text-[10px] uppercase tracking-[0.18em] ${ui.mutedText}`}>Primary button</p>
+          {primaryButton ? (
+            <ComponentPreview component={primaryButton} tokens={result.tokens} theme={theme} showSpecs={false} />
+          ) : (
+            <p className={`text-xs ${ui.mutedText}`}>Not detected</p>
+          )}
+        </div>
+
+        {/* Canvas */}
+        <div className={`${ui.softPanel} p-4 flex flex-col justify-between`}>
+          <p className={`text-[10px] uppercase tracking-[0.18em] ${ui.mutedText}`}>Canvas</p>
+          <div className="space-y-2">
+            {result.layout.contentWidth ? (
+              <div>
+                <p className={`text-2xl font-semibold tabular-nums ${ui.headingText}`}>
+                  {result.layout.contentWidth}
+                  <span className={`text-sm font-normal ml-0.5 ${ui.mutedText}`}>px</span>
+                </p>
+                <p className={`text-[11px] ${ui.mutedText}`}>max content width</p>
+              </div>
+            ) : (
+              <p className={`text-xs ${ui.mutedText}`}>Not detected</p>
+            )}
+            {result.layout.spacingScale[0] && (
+              <p className={`text-[11px] ${ui.mutedText}`}>
+                {result.layout.spacingScale[0]}px base unit
+              </p>
+            )}
           </div>
         </div>
       </div>
+
+      {/* One-line summary */}
+      {summaryParts.length > 0 && (
+        <div className={`${ui.softPanel} px-5 py-4`}>
+          <p className={`text-sm ${ui.bodyText}`}>
+            <span className={`font-medium ${ui.headingText}`}>At a glance — </span>
+            {summaryParts.join(" · ")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -798,37 +863,6 @@ function SectionShell({
   );
 }
 
-function OverviewCard({
-  label,
-  value,
-  detail,
-  theme
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  theme: ThemeMode;
-}) {
-  const ui = getThemeClasses(theme);
-  return (
-    <div className={`${ui.softPanel} p-5`}>
-      <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.mutedText}`}>{label}</p>
-      <p className={`mt-3 text-xl font-semibold ${ui.headingText}`}>{value}</p>
-      <p className={`mt-2 text-sm ${ui.bodyText}`}>{detail}</p>
-    </div>
-  );
-}
-
-function MiniMetric({ label, value, theme }: { label: string; value: number; theme: ThemeMode }) {
-  const ui = getThemeClasses(theme);
-  return (
-    <div className={`${ui.metricPanel} p-4`}>
-      <p className={`text-[10px] uppercase tracking-[0.2em] ${ui.mutedText}`}>{label}</p>
-      <p className={`mt-2 text-2xl font-semibold ${ui.headingText}`}>{value}</p>
-    </div>
-  );
-}
-
 function EmptyState({ message, theme }: { message: string; theme: ThemeMode }) {
   const ui = getThemeClasses(theme);
   return <div className={`${ui.softPanel} p-5 text-sm ${ui.mutedText}`}>{message}</div>;
@@ -836,12 +870,6 @@ function EmptyState({ message, theme }: { message: string; theme: ThemeMode }) {
 
 
 interface SummaryModel {
-  counts: {
-    colors: number;
-    typography: number;
-    layouts: number;
-    components: number;
-  };
   primaryColor?: DesignTokens["colors"][number];
   mainTypography?: DesignTokens["typography"][number];
   fontFamilies: string[];
@@ -882,12 +910,6 @@ function buildSummary(result: ExtractionResult): SummaryModel {
   }, {});
 
   return {
-    counts: {
-      colors: result.tokens.colors.length,
-      typography: result.tokens.typography.length,
-      layouts: result.layout.spacingScale.length,
-      components: result.components.length
-    },
     primaryColor: primaryColors[0] ?? result.tokens.colors[0],
     mainTypography: headings[0] ?? body,
     fontFamilies,
