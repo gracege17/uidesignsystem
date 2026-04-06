@@ -61,6 +61,39 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
     return "none";
   };
 
+  // Parse a box-shadow string and return the color of the first inset shadow found.
+  // Many modern button libraries (Zendesk Garden, Radix, Headless UI) use
+  // `box-shadow: inset 0 0 0 Xpx <color>` instead of `border` so that the
+  // visual stroke doesn't affect layout.  The CSS `border` properties are
+  // "none" / 0 in these cases, so we fall back to the inset shadow color.
+  const extractInsetShadowColor = (boxShadow: string): string | undefined => {
+    if (!boxShadow.includes("inset")) return undefined;
+
+    // Split shadows on top-level commas (not those inside functional notations).
+    const shadows: string[] = [];
+    let depth = 0;
+    let current = "";
+    for (const char of boxShadow) {
+      if (char === "(") depth++;
+      else if (char === ")") depth--;
+      if (char === "," && depth === 0) {
+        shadows.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    if (current.trim()) shadows.push(current.trim());
+
+    for (const shadow of shadows) {
+      if (!shadow.includes("inset")) continue;
+      const colorMatch = shadow.match(/rgba?\([^)]+\)|hsla?\([^)]+\)|#[0-9a-fA-F]{3,8}\b/);
+      if (colorMatch) return colorMatch[0];
+    }
+
+    return undefined;
+  };
+
   const hasMeaningfulStyles = (node: SerializedStyleNode): boolean =>
     Boolean(
       node.textColor ||
@@ -134,11 +167,13 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
 
   const resolvePadding = (
     element: HTMLElement,
-    style: CSSStyleDeclaration
+    style: CSSStyleDeclaration,
+    rect: DOMRect
   ): Pick<
     SerializedStyleNode,
     "paddingTop" | "paddingRight" | "paddingBottom" | "paddingLeft"
   > => {
+    // 1. Self padding — fast path for elements with direct CSS padding.
     const selfPadding = {
       paddingTop: parsePx(style.paddingTop) ?? 0,
       paddingRight: parsePx(style.paddingRight) ?? 0,
@@ -162,7 +197,7 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
       element.getAttribute("role") === "button" ||
       (tagName === "a" && Boolean(element.textContent?.trim()));
 
-    if (!isButtonLike) {
+    if (!isButtonLike || rect.width === 0 || rect.height === 0) {
       return {
         paddingTop: undefined,
         paddingRight: undefined,
@@ -171,6 +206,34 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
       };
     }
 
+    // 2. Bounding-box delta — measure the visual gap between the button edge and its
+    //    content using the Range API. This is framework-agnostic: it works regardless
+    //    of how many nested elements the framework uses to apply padding.
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const contentRect = range.getBoundingClientRect();
+
+      if (contentRect.width > 0 && contentRect.height > 0) {
+        const borderTop = parsePx(style.borderTopWidth) ?? 0;
+        const borderRight = parsePx(style.borderRightWidth) ?? 0;
+        const borderBottom = parsePx(style.borderBottomWidth) ?? 0;
+        const borderLeft = parsePx(style.borderLeftWidth) ?? 0;
+
+        const pt = Math.round(Math.max(0, contentRect.top - rect.top - borderTop));
+        const pr = Math.round(Math.max(0, rect.right - contentRect.right - borderRight));
+        const pb = Math.round(Math.max(0, rect.bottom - contentRect.bottom - borderBottom));
+        const pl = Math.round(Math.max(0, contentRect.left - rect.left - borderLeft));
+
+        if (pt + pr + pb + pl > 0) {
+          return { paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl };
+        }
+      }
+    } catch {
+      // Range API unavailable — fall through to descendant scan.
+    }
+
+    // 3. Fallback: scan descendants and pick the one with the most total padding.
     let bestCandidate:
       | Pick<SerializedStyleNode, "paddingTop" | "paddingRight" | "paddingBottom" | "paddingLeft">
       | undefined;
@@ -222,15 +285,18 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
       }
 
       let backgroundColor = style.backgroundColor;
-      if (
-        (backgroundColor === "rgba(0, 0, 0, 0)" || backgroundColor === "transparent") &&
-        element.children.length > 0
-      ) {
-        for (const child of Array.from(element.children).slice(0, 3)) {
-          const childBg = window.getComputedStyle(child as HTMLElement).backgroundColor;
-          if (childBg !== "rgba(0, 0, 0, 0)" && childBg !== "transparent") {
-            backgroundColor = childBg;
-            break;
+      if (backgroundColor === "rgba(0, 0, 0, 0)" || backgroundColor === "transparent") {
+        // Gradient fills: background-color is transparent but background-image has the color.
+        if (style.backgroundImage !== "none" && style.backgroundImage.includes("gradient")) {
+          const match = style.backgroundImage.match(/rgba?\([^)]+\)|#[0-9a-fA-F]{3,8}/);
+          if (match) backgroundColor = match[0];
+        } else if (element.children.length > 0) {
+          for (const child of Array.from(element.children).slice(0, 3)) {
+            const childBg = window.getComputedStyle(child as HTMLElement).backgroundColor;
+            if (childBg !== "rgba(0, 0, 0, 0)" && childBg !== "transparent") {
+              backgroundColor = childBg;
+              break;
+            }
           }
         }
       }
@@ -239,7 +305,7 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         style.borderStyle !== "none" &&
         (parseFloat(style.borderTopWidth) > 0 || parseFloat(style.borderRightWidth) > 0)
           ? style.borderColor
-          : undefined;
+          : extractInsetShadowColor(style.boxShadow);
       const boxShadow = style.boxShadow !== "none" ? style.boxShadow : undefined;
       const filter = style.filter !== "none" ? style.filter : undefined;
       const backdropFilter = style.backdropFilter !== "none" ? style.backdropFilter : undefined;
@@ -278,7 +344,7 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         })(),
         gridTemplateColumns: style.display === "grid" ? style.gridTemplateColumns : undefined,
         maxWidth: style.maxWidth !== "none" ? parsePx(style.maxWidth) : undefined,
-        ...resolvePadding(element, style),
+        ...resolvePadding(element, style, rect),
         justifyContent: style.justifyContent,
         alignItems: style.alignItems,
         flexWrap: style.flexWrap,
