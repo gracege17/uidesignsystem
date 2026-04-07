@@ -51,6 +51,7 @@ export interface SerializedStyleNode {
   lineHeight?: number | string;
   letterSpacing?: number | string;
   textTransform?: TypographyToken["textTransform"];
+  textAlign?: TypographyToken["textAlign"];
   landmark?: "nav" | "header" | "main" | "footer" | "aside";
   pageY?: number;
   position?: string;
@@ -70,6 +71,7 @@ interface TypographyCandidate {
   lineHeight: number;
   letterSpacing: number;
   textTransform: TypographyToken["textTransform"];
+  textAlignCounts: Record<string, number>;
   count: number;
   sources: string[];
 }
@@ -907,14 +909,16 @@ function collectTypographyCandidates(nodes: SerializedStyleNode[]): TypographyCa
       typography.textTransform ?? "none"
     ].join("|");
 
+    const align = node.textAlign ?? "left";
     const existing = candidates.get(key);
     if (existing) {
       existing.count += 1;
       existing.sources.push(node.source);
+      existing.textAlignCounts[align] = (existing.textAlignCounts[align] ?? 0) + 1;
       continue;
     }
 
-    candidates.set(key, { ...typography, count: 1, sources: [node.source] });
+    candidates.set(key, { ...typography, textAlignCounts: { [align]: 1 }, count: 1, sources: [node.source] });
   }
 
   return Array.from(candidates.values());
@@ -973,6 +977,18 @@ function buildColorTokens(candidates: ColorCandidate[]): ColorToken[] {
   });
 }
 
+function dominantTextAlign(counts: Record<string, number>): TypographyToken["textAlign"] {
+  let best: string = "left";
+  let bestCount = 0;
+  for (const [align, count] of Object.entries(counts)) {
+    if (count > bestCount) {
+      best = align;
+      bestCount = count;
+    }
+  }
+  return best as TypographyToken["textAlign"];
+}
+
 function buildTypographyTokens(candidates: TypographyCandidate[]): TypographyToken[] {
   // Always keep the largest-fontSize candidate even if it only appears once —
   // hero headings are naturally unique on a page and would otherwise be filtered out.
@@ -997,7 +1013,8 @@ function buildTypographyTokens(candidates: TypographyCandidate[]): TypographyTok
       fontWeight: candidate.fontWeight,
       lineHeight: candidate.lineHeight,
       letterSpacing: candidate.letterSpacing,
-      textTransform: candidate.textTransform
+      textTransform: candidate.textTransform,
+      textAlign: dominantTextAlign(candidate.textAlignCounts)
     };
   });
 }
@@ -1050,7 +1067,7 @@ function addColorCandidate(
 
 function parseTypographyCandidate(
   node: SerializedStyleNode
-): Omit<TypographyCandidate, "count" | "sources"> | null {
+): Omit<TypographyCandidate, "count" | "sources" | "textAlignCounts"> | null {
   if (!node.fontFamily) {
     return null;
   }

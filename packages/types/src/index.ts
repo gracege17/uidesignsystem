@@ -112,6 +112,10 @@ export interface TypographyToken extends TokenBase {
    * Optional text transform extracted from CSS.
    */
   textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
+  /**
+   * Optional text alignment extracted from CSS.
+   */
+  textAlign?: "left" | "center" | "right" | "justify";
 }
 
 /**

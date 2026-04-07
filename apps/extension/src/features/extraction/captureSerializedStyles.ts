@@ -61,6 +61,19 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
     return "none";
   };
 
+  const normalizeTextAlign = (value: string): SerializedStyleNode["textAlign"] => {
+    if (
+      value === "left" ||
+      value === "center" ||
+      value === "right" ||
+      value === "justify"
+    ) {
+      return value;
+    }
+
+    return "left";
+  };
+
   // Parse a box-shadow string and return the color of the first inset shadow found.
   // Many modern button libraries (Zendesk Garden, Radix, Headless UI) use
   // `box-shadow: inset 0 0 0 Xpx <color>` instead of `border` so that the
@@ -395,7 +408,8 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
         fontWeight: hasText ? style.fontWeight : undefined,
         lineHeight: hasText ? lineHeight : undefined,
         letterSpacing: hasText ? letterSpacing : undefined,
-        textTransform: hasText ? normalizeTextTransform(style.textTransform) : undefined
+        textTransform: hasText ? normalizeTextTransform(style.textTransform) : undefined,
+        textAlign: hasText ? normalizeTextAlign(style.textAlign) : undefined
       };
 
       if (!hasMeaningfulStyles(snapshot)) {

@@ -1401,3 +1401,39 @@ test("inferComponentType: <a> with background but too many children is NOT a But
   const buttons = result.components.filter((c) => c.type === "Button");
   assert.equal(buttons.length, 0, "<a> with many children must not be a Button");
 });
+
+test("extractTokens: same style with different textAlign produces one token with dominant alignment", () => {
+  // Real pattern: Notion homepage uses Inter 48px bold centered in hero, left-aligned in sections
+  const tokens = extractTokens([
+    {
+      source: "h1.hero-title",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 48,
+      fontWeight: 700,
+      lineHeight: 56,
+      letterSpacing: -0.5,
+      textAlign: "center"
+    },
+    {
+      source: "h2.section-title",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 48,
+      fontWeight: 700,
+      lineHeight: 56,
+      letterSpacing: -0.5,
+      textAlign: "left"
+    },
+    {
+      source: "h2.section-title-2",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 48,
+      fontWeight: 700,
+      lineHeight: 56,
+      letterSpacing: -0.5,
+      textAlign: "left"
+    }
+  ]);
+
+  assert.equal(tokens.typography.length, 1, "Same style with different alignment must produce one token");
+  assert.equal(tokens.typography[0].textAlign, "left", "Dominant alignment (2x left vs 1x center) must win");
+});
