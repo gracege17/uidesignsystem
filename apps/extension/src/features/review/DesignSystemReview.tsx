@@ -30,7 +30,7 @@ export default function DesignSystemReview({
   const summary = useMemo(() => buildSummary(result), [result]);
 
   const copySection = async (key: ReviewTab | "everything") => {
-    const text = buildCopyText(key, summary, result.tokens);
+    const text = buildCopyText(key, summary, result.tokens, result.components);
     await navigator.clipboard.writeText(text);
     setCopiedKey(key);
     globalThis.setTimeout(() => {
@@ -1511,13 +1511,13 @@ function getThemeClasses(theme: ThemeMode) {
   };
 }
 
-function buildCopyText(key: ReviewTab | "everything", summary: SummaryModel, tokens: DesignTokens) {
+function buildCopyText(key: ReviewTab | "everything", summary: SummaryModel, tokens: DesignTokens, components: ExtractedComponent[]) {
   const sections = {
     overview: buildOverviewCopy(summary),
     color: buildColorCopy(tokens, summary),
     typography: buildTypographyCopy(summary),
     layout: buildLayoutCopy(summary),
-    components: buildComponentsCopy(summary)
+    components: buildComponentsCopy(components, tokens)
   };
 
   if (key === "everything") {
@@ -1709,9 +1709,97 @@ function buildLayoutCopy(_summary: SummaryModel) {
   return "Spacing & Layout — see extension for spacing scale, content width, and grid details.";
 }
 
-function buildComponentsCopy(summary: SummaryModel) {
-  return [
-    "Components",
-    ...summary.componentFamilies.slice(0, 6).map((family) => `- ${family.type}: ${family.count} detected variant${family.count !== 1 ? "s" : ""}`)
-  ].join("\n");
+function buildComponentsCopy(components: ExtractedComponent[], tokens: DesignTokens) {
+  const STYLE_PRIORITY: Record<string, number> = { fill: 0, outline: 1, ghost: 2 };
+
+  // Group by type and pick the best representative per family
+  const familyMap = new Map<string, ExtractedComponent[]>();
+  for (const c of components) {
+    const list = familyMap.get(c.type) ?? [];
+    list.push(c);
+    familyMap.set(c.type, list);
+  }
+
+  // Sort families by count descending, take top 6
+  const families = [...familyMap.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 6);
+
+  if (families.length === 0) return "Components\nNo components detected.";
+
+  const lines: string[] = ["Components"];
+
+  for (const [type, members] of families) {
+    // Pick best representative: prefer fill + default state
+    const sorted = [...members].sort((a, b) => {
+      const styleDiff = (STYLE_PRIORITY[a.variants.style] ?? 9) - (STYLE_PRIORITY[b.variants.style] ?? 9);
+      if (styleDiff !== 0) return styleDiff;
+      if (a.variants.state === "default" && b.variants.state !== "default") return -1;
+      if (b.variants.state === "default" && a.variants.state !== "default") return 1;
+      return 0;
+    });
+    const rep = sorted[0];
+
+    lines.push("");
+    lines.push(`${type}`);
+
+    // Style variant
+    lines.push(`  style: ${rep.variants.style}`);
+    lines.push(`  size: ${rep.variants.size}`);
+
+    // Dimensions
+    if (rep.width || rep.height) {
+      const dims = [rep.width ? `${rep.width}px wide` : null, rep.height ? `${rep.height}px tall` : null].filter(Boolean).join(", ");
+      lines.push(`  dimensions: ${dims}`);
+    }
+
+    // Padding
+    const pad = rep.padding ?? rep.autoLayout?.padding;
+    if (pad) {
+      lines.push(`  padding: ${pad.top}px ${pad.right}px ${pad.bottom}px ${pad.left}px`);
+    }
+
+    // Corner radius
+    if (rep.cornerRadius !== undefined) {
+      lines.push(`  border-radius: ${rep.cornerRadius}px`);
+    }
+
+    // Background color (fill token)
+    const fillToken = tokens.colors.find((t) => rep.tokens.fills.includes(t.id));
+    if (fillToken) {
+      const hex = colorToHex(fillToken.value);
+      lines.push(`  background: ${hex ?? fillToken.value}`);
+    }
+
+    // Text color
+    const textToken = tokens.colors.find((t) => rep.tokens.text.includes(t.id));
+    if (textToken) {
+      const hex = colorToHex(textToken.value);
+      lines.push(`  text-color: ${hex ?? textToken.value}`);
+    }
+
+    // Typography
+    const typoToken = tokens.typography.find((t) => rep.tokens.typography.includes(t.id));
+    if (typoToken) {
+      lines.push(`  font: ${typoToken.fontFamily}, ${typoToken.fontSize}px, weight ${typoToken.fontWeight}`);
+    }
+
+    // Border (stroke token)
+    const strokeToken = tokens.colors.find((t) => rep.tokens.strokes.includes(t.id));
+    if (strokeToken) {
+      const hex = colorToHex(strokeToken.value);
+      lines.push(`  border-color: ${hex ?? strokeToken.value}`);
+    }
+
+    // Layout direction
+    if (rep.autoLayout) {
+      const al = rep.autoLayout;
+      const layoutParts = [`direction: ${al.direction}`];
+      if (al.gap !== undefined) layoutParts.push(`gap: ${al.gap}px`);
+      if (al.primaryAlignment) layoutParts.push(`align: ${al.primaryAlignment}`);
+      lines.push(`  layout: ${layoutParts.join(", ")}`);
+    }
+  }
+
+  return lines.join("\n");
 }
