@@ -206,64 +206,25 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
       };
     }
 
-    // 2. Bounding-box delta — measure the visual gap between the button edge and its
-    //    content using the Range API. This is framework-agnostic: it works regardless
-    //    of how many nested elements the framework uses to apply padding.
-    try {
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      const contentRect = range.getBoundingClientRect();
-
-      if (contentRect.width > 0 && contentRect.height > 0) {
-        const borderTop = parsePx(style.borderTopWidth) ?? 0;
-        const borderRight = parsePx(style.borderRightWidth) ?? 0;
-        const borderBottom = parsePx(style.borderBottomWidth) ?? 0;
-        const borderLeft = parsePx(style.borderLeftWidth) ?? 0;
-
-        const pt = Math.round(Math.max(0, contentRect.top - rect.top - borderTop));
-        const pr = Math.round(Math.max(0, rect.right - contentRect.right - borderRight));
-        const pb = Math.round(Math.max(0, rect.bottom - contentRect.bottom - borderBottom));
-        const pl = Math.round(Math.max(0, contentRect.left - rect.left - borderLeft));
-
-        if (pt + pr + pb + pl > 0) {
-          return { paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl };
-        }
-      }
-    } catch {
-      // Range API unavailable — fall through to descendant scan.
-    }
-
-    // 3. Fallback: scan descendants and pick the one with the most total padding.
-    let bestCandidate:
-      | Pick<SerializedStyleNode, "paddingTop" | "paddingRight" | "paddingBottom" | "paddingLeft">
-      | undefined;
-    let bestScore = 0;
-
-    for (const descendant of Array.from(element.querySelectorAll<HTMLElement>("*")).slice(0, 12)) {
-      const descendantStyles = window.getComputedStyle(descendant);
-      const candidate = {
-        paddingTop: parsePx(descendantStyles.paddingTop) ?? 0,
-        paddingRight: parsePx(descendantStyles.paddingRight) ?? 0,
-        paddingBottom: parsePx(descendantStyles.paddingBottom) ?? 0,
-        paddingLeft: parsePx(descendantStyles.paddingLeft) ?? 0
-      };
-      const score =
-        candidate.paddingTop + candidate.paddingRight + candidate.paddingBottom + candidate.paddingLeft;
-
-      if (score > bestScore) {
-        bestCandidate = candidate;
-        bestScore = score;
+    // 2. Check direct children only — many frameworks (Tailwind, MUI, Webflow)
+    //    apply padding to a single inner wrapper span rather than the button itself.
+    for (const child of Array.from(element.children).slice(0, 3)) {
+      const childStyle = window.getComputedStyle(child as HTMLElement);
+      const pt = parsePx(childStyle.paddingTop) ?? 0;
+      const pr = parsePx(childStyle.paddingRight) ?? 0;
+      const pb = parsePx(childStyle.paddingBottom) ?? 0;
+      const pl = parsePx(childStyle.paddingLeft) ?? 0;
+      if (pt + pr + pb + pl > 0) {
+        return { paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl };
       }
     }
 
-    return (
-      bestCandidate ?? {
-        paddingTop: undefined,
-        paddingRight: undefined,
-        paddingBottom: undefined,
-        paddingLeft: undefined
-      }
-    );
+    return {
+      paddingTop: undefined,
+      paddingRight: undefined,
+      paddingBottom: undefined,
+      paddingLeft: undefined
+    };
   };
 
   const LANDMARK_TAGS = new Set(["nav", "header", "main", "footer", "aside"]);
@@ -363,6 +324,7 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
 
           return best > 0 ? best : undefined;
         })(),
+        position: style.position,
         gridTemplateColumns: style.display === "grid" ? style.gridTemplateColumns : undefined,
         maxWidth: style.maxWidth !== "none" ? parsePx(style.maxWidth) : undefined,
         ...resolvePadding(element, style, rect),

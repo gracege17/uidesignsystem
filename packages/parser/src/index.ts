@@ -53,6 +53,7 @@ export interface SerializedStyleNode {
   textTransform?: TypographyToken["textTransform"];
   landmark?: "nav" | "header" | "main" | "footer" | "aside";
   pageY?: number;
+  position?: string;
 }
 
 interface ColorCandidate {
@@ -430,6 +431,7 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
   const isButtonLikeAnchor =
     node.tagName === "a" &&
     Boolean(node.backgroundColor) &&
+    node.position !== "absolute" &&
     (node.height ?? 999) <= 80 &&
     (node.childCount ?? 999) <= 3 &&
     Boolean((node.textContent ?? "").trim());
