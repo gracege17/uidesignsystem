@@ -173,12 +173,13 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
     SerializedStyleNode,
     "paddingTop" | "paddingRight" | "paddingBottom" | "paddingLeft"
   > => {
-    // 1. Self padding — fast path for elements with direct CSS padding.
+    // 1. Self padding — logical properties take precedence over physical ones in CSS layout.
+    // When both are set, the browser uses the logical value, so we check logical first.
     const selfPadding = {
-      paddingTop: parsePx(style.paddingTop) ?? 0,
-      paddingRight: parsePx(style.paddingRight) ?? 0,
-      paddingBottom: parsePx(style.paddingBottom) ?? 0,
-      paddingLeft: parsePx(style.paddingLeft) ?? 0
+      paddingTop: parsePx(style.paddingBlockStart) || parsePx(style.paddingTop) || 0,
+      paddingRight: parsePx(style.paddingInlineEnd) || parsePx(style.paddingRight) || 0,
+      paddingBottom: parsePx(style.paddingBlockEnd) || parsePx(style.paddingBottom) || 0,
+      paddingLeft: parsePx(style.paddingInlineStart) || parsePx(style.paddingLeft) || 0
     };
 
     if (

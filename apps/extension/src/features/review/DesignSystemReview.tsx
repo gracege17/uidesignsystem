@@ -283,16 +283,22 @@ function ColorSection({
         <section key={group.label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-8">
           <div className={`pt-3 text-sm font-medium ${ui.subtleText}`}>{group.label}</div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {group.items.map((token) => (
-              <div key={token.id} className={`${ui.softPanel} overflow-hidden`}>
-                <div className={`h-20 ${ui.rule}`} style={{ backgroundColor: token.value }} />
-                <div className="p-4">
-                  <p className={`text-sm font-semibold ${ui.headingText}`}>{token.name}</p>
-                  <p className={`mt-1 text-xs ${ui.bodyText}`}>{token.value}</p>
-                  <p className={`mt-2 truncate text-[11px] ${ui.mutedText}`}>{token.source}</p>
+            {group.items.map((token) => {
+              const hex = colorToHex(token.value);
+              return (
+                <div key={token.id} className={`${ui.softPanel} overflow-hidden`}>
+                  <div className={`h-20 ${ui.rule}`} style={{ backgroundColor: token.value }} />
+                  <div className="p-4">
+                    <p className={`text-sm font-semibold ${ui.headingText}`}>{token.name}</p>
+                    <p className={`mt-1 text-xs font-mono ${ui.bodyText}`}>{hex ?? token.value}</p>
+                    {hex && hex !== token.value.toUpperCase() && (
+                      <p className={`mt-0.5 text-[11px] font-mono ${ui.mutedText}`}>{token.value}</p>
+                    )}
+                    <p className={`mt-2 truncate text-[11px] ${ui.mutedText}`}>{token.source}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       ))}
@@ -1390,6 +1396,25 @@ function getReadableTextColor(
   }
 
   return backgroundLuminance > 0.6 ? fallbackLight : fallbackDark;
+}
+
+function colorToHex(value: string): string | null {
+  const hexMatch = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hexMatch) {
+    const h = hexMatch[1];
+    const full = h.length === 3 ? h.split("").map((c) => `${c}${c}`).join("") : h;
+    return `#${full.toUpperCase()}`;
+  }
+
+  const rgbMatch = value.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (rgbMatch) {
+    const r = Number(rgbMatch[1]).toString(16).padStart(2, "0");
+    const g = Number(rgbMatch[2]).toString(16).padStart(2, "0");
+    const b = Number(rgbMatch[3]).toString(16).padStart(2, "0");
+    return `#${r}${g}${b}`.toUpperCase();
+  }
+
+  return null;
 }
 
 function getColorLuminance(color: string | undefined) {
