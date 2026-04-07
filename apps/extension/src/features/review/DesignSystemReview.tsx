@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DesignTokens, ExtractedComponent, ExtractionResult, LayoutMetrics } from "@extractor/types";
 
 const REVIEW_TABS = [
@@ -11,6 +11,9 @@ const REVIEW_TABS = [
 
 type ReviewTab = (typeof REVIEW_TABS)[number]["id"];
 type ThemeMode = "light" | "dark";
+type HeroButtonSlotLabel = "Main CTA" | "Secondary CTA" | "Other Button";
+type HeroButtonSlot = { label: HeroButtonSlotLabel; component?: ExtractedComponent };
+type FilledHeroButtonSlot = { label: HeroButtonSlotLabel; component: ExtractedComponent };
 
 export default function DesignSystemReview({
   result,
@@ -311,6 +314,38 @@ function TypographySection({
   theme: ThemeMode;
 }) {
   const ui = getThemeClasses(theme);
+
+  useEffect(() => {
+    const defs = summary.fontFamilies
+      .map((family) => getOpenSourceFontDefinition(family))
+      .filter((definition): definition is OpenSourceFontDefinition => Boolean(definition));
+
+    if (defs.length === 0) {
+      return;
+    }
+
+    const inserted: HTMLLinkElement[] = [];
+    for (const definition of defs) {
+      const id = `open-font-${definition.id}`;
+      if (document.getElementById(id)) {
+        continue;
+      }
+
+      const link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      link.href = definition.url;
+      document.head.appendChild(link);
+      inserted.push(link);
+    }
+
+    return () => {
+      for (const link of inserted) {
+        link.remove();
+      }
+    };
+  }, [summary.fontFamilies]);
+
   const seenIds = new Set<string>();
   // Labels describe what we actually know — size position and range — not assumed semantic role
   const scale: Array<{ role: string; token: NonNullable<typeof summary.h1> }> = [
@@ -339,7 +374,7 @@ function TypographySection({
             <p className={`text-[11px] uppercase tracking-[0.22em] ${ui.heroMetaText}`}>Typeface</p>
             <p className={`mt-3 text-3xl font-semibold tracking-tight ${ui.heroHeadingText}`}>{family}</p>
             <p className={`mt-2 text-[11px] ${ui.heroMetaText}`}>
-              Preview uses a system fallback — not the actual font. To use <span className="italic">{family}</span>, source it separately.
+              {buildFontPreviewStatus(family).message}
             </p>
           </div>
         ))}
@@ -358,6 +393,7 @@ function TypographySection({
               <p
                 className={`pr-6 ${ui.headingText}`}
                 style={{
+                  fontFamily: buildPreviewFontStack(token.fontFamily),
                   fontSize: `${Math.min(token.fontSize, 64)}px`,
                   lineHeight: `${Math.min(token.lineHeight, 72)}px`,
                   fontWeight: token.fontWeight,
@@ -503,31 +539,10 @@ function ComponentsSection({
 }) {
   const ui = getThemeClasses(theme);
   const STYLE_PRIORITY: Record<string, number> = { fill: 0, outline: 1, ghost: 2 };
-  const BUTTON_STYLES = ["fill", "outline", "ghost"] as const;
-
-  const baseButton = pickPrimaryButton(result.components);
-
-  // For each style, use a real extracted button if available; otherwise synthesize from base
-  const buttonVariants: Array<{ component: ExtractedComponent; synthesized: boolean }> =
-    baseButton
-      ? BUTTON_STYLES.map((style) => {
-          const real = result.components.find(
-            (c) =>
-              c.type === "Button" &&
-              c.variants.style === style &&
-              c.variants.state === "default"
-          );
-          if (real) return { component: real, synthesized: false };
-          return {
-            component: {
-              ...baseButton,
-              id: `${baseButton.id}-${style}`,
-              variants: { ...baseButton.variants, style }
-            },
-            synthesized: true
-          };
-        })
-      : [];
+  const heroButtonSlots = pickHeroButtons(result.components);
+  const visibleHeroButtons = heroButtonSlots.filter(
+    (entry): entry is FilledHeroButtonSlot => Boolean(entry.component)
+  );
 
   // Pick the best Card representative (fill > outline > ghost)
   const baseCard =
@@ -551,11 +566,10 @@ function ComponentsSection({
     <div className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
 
-      {buttonVariants.length > 0 && (() => {
-        const realVariants = buttonVariants.filter((v) => !v.synthesized);
-        if (realVariants.length === 0) return null;
-        const fillEntry = realVariants.find((v) => v.component.variants.style === "fill");
-        const fillComponent = fillEntry?.component ?? realVariants[0].component;
+      {visibleHeroButtons.length > 0 && (() => {
+        const fillComponent =
+          visibleHeroButtons.find((entry) => entry.label === "Main CTA")?.component ??
+          visibleHeroButtons[0].component;
         const fillType = result.tokens.typography.find((t) => fillComponent.tokens.typography.includes(t.id));
         const fillPad = fillComponent.padding ?? fillComponent.autoLayout?.padding;
         const specs: { label: string; value: string }[] = [];
@@ -567,14 +581,17 @@ function ComponentsSection({
           <div className={`${ui.softPanel} p-5 md:col-span-2`}>
             <div className="flex items-start justify-between gap-3">
               <p className={`text-sm font-semibold ${ui.headingText}`}>Button</p>
-              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{realVariants.length} {realVariants.length === 1 ? "variant found" : "variants found"}</span>
+              <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{visibleHeroButtons.length} {visibleHeroButtons.length === 1 ? "cta found" : "ctas found"}</span>
             </div>
             <div className={`mt-4 p-4 ${ui.previewPanel} space-y-5`}>
               <div className="flex flex-wrap items-center gap-8">
-                {realVariants.map(({ component }) => (
+                {visibleHeroButtons.map(({ label, component }) => (
                   <div key={component.id} className="flex flex-col items-center gap-2">
                     <ComponentPreview component={component} tokens={result.tokens} theme={theme} showSpecs={false} />
-                    <p className={`text-[10px] capitalize ${ui.mutedText}`}>{component.variants.style}</p>
+                    <p className={`text-[10px] font-medium ${ui.mutedText}`}>{label}</p>
+                    <p className={`max-w-[180px] truncate text-[10px] ${ui.mutedText}`} title={component.textContent ?? component.source}>
+                      {component.textContent ?? component.name}
+                    </p>
                     <p className={`max-w-[140px] truncate text-[9px] ${ui.mutedText} opacity-60`} title={component.source}>{component.source}</p>
                   </div>
                 ))}
@@ -594,7 +611,7 @@ function ComponentsSection({
         );
       })()}
 
-      {!baseCard && (buttonVariants.length > 0 || otherCurated.length > 0) && (
+      {!baseCard && (visibleHeroButtons.length > 0 || otherCurated.length > 0) && (
         <div className={`${ui.softPanel} p-5 md:col-span-2 opacity-50`}>
           <div className="flex items-start justify-between gap-3">
             <p className={`text-sm font-semibold ${ui.headingText}`}>Card</p>
@@ -641,25 +658,26 @@ function ComponentsSection({
         );
       })()}
 
-      {otherCurated.map((component) => (
+      {otherCurated.map((component) => {
+        const meta = getComponentDisplayMeta(component);
+        return (
         <div key={component.id} className={`${ui.softPanel} p-5`}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className={`text-sm font-semibold ${ui.headingText}`}>{component.type}</p>
-              <p className={`mt-1 text-xs ${ui.bodyText}`}>
-                {component.variants.style} · {component.variants.size} · {component.variants.state}
-              </p>
+              <p className={`text-sm font-semibold ${ui.headingText}`}>{meta.title}</p>
+              <p className={`mt-1 text-xs ${ui.bodyText}`}>{meta.subtitle}</p>
             </div>
-            <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{component.name}</span>
+            <span className={`text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>{meta.badge}</span>
           </div>
 
           <div className={`mt-4 p-4 ${ui.previewPanel}`}>
             <ComponentPreview component={component} tokens={result.tokens} theme={theme} />
           </div>
         </div>
-      ))}
+        );
+      })}
 
-      {buttonVariants.length === 0 && !baseCard && otherCurated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
+      {visibleHeroButtons.length === 0 && !baseCard && otherCurated.length === 0 ? <EmptyState message="No curated component families were found." theme={theme} /> : null}
       </div>
     </div>
   );
@@ -671,7 +689,40 @@ function pickPrimaryButton(components: ExtractedComponent[]): ExtractedComponent
     return undefined;
   }
 
-  return [...buttons].sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left))[0];
+  const defaultButtons = buttons.filter((component) => component.variants.state === "default");
+  const pool = defaultButtons.length > 0 ? defaultButtons : buttons;
+  const fillButtons = pool.filter((component) => component.variants.style === "fill");
+  const prioritized = fillButtons.length > 0 ? fillButtons : pool;
+
+  return [...prioritized].sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left))[0];
+}
+
+function pickHeroButtons(components: ExtractedComponent[]): HeroButtonSlot[] {
+  const buttons = components.filter((component) => component.type === "Button");
+  if (buttons.length === 0) {
+    return [];
+  }
+
+  const defaultButtons = buttons.filter((component) => component.variants.state === "default");
+  const statePool = defaultButtons.length > 0 ? defaultButtons : buttons;
+  const ranked = [...statePool].sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left));
+
+  const mainCta = ranked.find((component) => component.variants.style === "fill") ?? ranked[0];
+  const remainingAfterMain = ranked.filter((component) => component.id !== mainCta?.id);
+
+  const secondaryCta =
+    remainingAfterMain.find((component) => component.variants.style === "outline") ??
+    remainingAfterMain[0];
+  const remainingAfterSecondary = remainingAfterMain.filter(
+    (component) => component.id !== secondaryCta?.id
+  );
+  const otherButton = remainingAfterSecondary[0];
+
+  return [
+    { label: "Main CTA", component: mainCta },
+    { label: "Secondary CTA", component: secondaryCta },
+    { label: "Other Button", component: otherButton }
+  ];
 }
 
 function scorePrimaryButton(component: ExtractedComponent): number {
@@ -693,6 +744,26 @@ function scorePrimaryButton(component: ExtractedComponent): number {
     score += 20;
   }
 
+  // Buttons higher on the page are more likely to be the primary CTA.
+  // pageY 0-200 covers nav + hero; 200-700 covers above-the-fold content.
+  if (component.pageY !== undefined) {
+    if (component.pageY <= 200) {
+      score += 80;
+    } else if (component.pageY <= 700) {
+      score += 50;
+    } else if (component.pageY <= 1400) {
+      score += 20;
+    }
+  }
+
+  if (component.width) {
+    score += Math.min(component.width, 320) * 0.2;
+  }
+
+  if (component.height) {
+    score += Math.min(component.height, 72) * 0.4;
+  }
+
   const padding = component.padding ?? component.autoLayout?.padding;
   if (padding) {
     score += padding.left + padding.right;
@@ -705,6 +776,34 @@ function scorePrimaryButton(component: ExtractedComponent): number {
   }
 
   return score;
+}
+
+function getComponentDisplayMeta(component: ExtractedComponent): {
+  title: string;
+  subtitle: string;
+  badge: string;
+} {
+  if (component.type === "Navigation") {
+    return {
+      title: "Top Nav",
+      subtitle: "Container · padding · gap",
+      badge: "top nav"
+    };
+  }
+
+  if (component.type === "NavigationItem") {
+    return {
+      title: "Top Nav Item",
+      subtitle: "Clickable link · inside top nav",
+      badge: "top nav item"
+    };
+  }
+
+  return {
+    title: component.type,
+    subtitle: `${component.variants.style} · ${component.variants.size} · ${component.variants.state}`,
+    badge: component.name
+  };
 }
 
 function ComponentPreview({
@@ -898,6 +997,55 @@ function ComponentPreview({
     );
   }
 
+  if (component.type === "NavigationItem") {
+    const itemBg = fill ?? "transparent";
+    const itemText = getReadableTextColor(
+      itemBg === "transparent" ? (theme === "light" ? "#ffffff" : "#0f172a") : itemBg,
+      text,
+      theme
+    );
+    const pad = component.padding ?? component.autoLayout?.padding;
+    const label = component.textContent?.trim() || "Overview";
+    const specs: { label: string; value: string }[] = [];
+    if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
+    if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
+    if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+
+    return (
+      <div className="space-y-4">
+        <a
+          href="#"
+          className="inline-block text-sm"
+          onClick={(e) => e.preventDefault()}
+          style={{
+            backgroundColor: itemBg === "transparent" ? undefined : itemBg,
+            color: itemText,
+            fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
+            fontSize: type ? `${Math.min(type.fontSize, 16)}px` : undefined,
+            fontWeight: type?.fontWeight,
+            borderRadius: component.cornerRadius !== undefined ? `${component.cornerRadius}px` : undefined,
+            ...(pad
+              ? { paddingTop: `${pad.top}px`, paddingRight: `${pad.right}px`, paddingBottom: `${pad.bottom}px`, paddingLeft: `${pad.left}px` }
+              : { padding: "8px 12px" }),
+            textDecoration: "none"
+          }}
+        >
+          {label}
+        </a>
+        {showSpecs && specs.length > 0 && (
+          <div className="space-y-1.5">
+            {specs.map((spec) => (
+              <div key={spec.label} className="grid grid-cols-[64px_1fr] gap-3 text-xs">
+                <span className={`font-medium ${ui.mutedText}`}>{spec.label}</span>
+                <span className={ui.bodyText}>{spec.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (component.type === "Accordion") {
     const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "8px";
     const accordionBg = fill ?? "transparent";
@@ -905,6 +1053,8 @@ function ComponentPreview({
     const headingText = text ?? (theme === "light" ? "#0f172a" : "#f8fafc");
     const bodyTextColor = theme === "light" ? "#475569" : "#94a3b8";
     const pad = component.padding ?? component.autoLayout?.padding;
+    const primaryLabel = component.textContent?.trim() || "Accordion item";
+    const supportingLabel = component.textContent?.trim() || "Expandable content";
     const specs: { label: string; value: string }[] = [];
     if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
     if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
@@ -927,37 +1077,34 @@ function ComponentPreview({
               : {})
           }}
         >
-          {/* collapsed row */}
           <div
             className="flex items-center justify-between py-4 text-sm"
             style={{ borderBottom: `1px solid ${dividerColor}`, color: headingText, fontWeight: type?.fontWeight ?? 600 }}
           >
-            <span>Payroll takes just a few clicks</span>
+            <span>{primaryLabel}</span>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.5 }}>
               <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          {/* expanded row */}
           <div style={{ borderBottom: `1px solid ${dividerColor}` }}>
             <div
               className="flex items-center justify-between py-4 text-sm"
               style={{ color: headingText, fontWeight: type?.fontWeight ?? 600 }}
             >
-              <span>Sync hours with payroll</span>
+              <span>{supportingLabel}</span>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M4 10l4-4 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
             <p className="pb-4 text-xs leading-relaxed" style={{ color: bodyTextColor }}>
-              Automatically calculates and syncs hours, PTO, and holidays with payroll.
+              Expand to inspect the extracted interaction styling and layout treatment.
             </p>
           </div>
-          {/* collapsed row */}
           <div
             className="flex items-center justify-between py-4 text-sm"
             style={{ borderBottom: `1px solid ${dividerColor}`, color: headingText, fontWeight: type?.fontWeight ?? 600 }}
           >
-            <span>Pay yourself compliantly</span>
+            <span>{component.name.replace(/^accordion\//, "").replace(/-/g, " ")}</span>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.5 }}>
               <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -1373,7 +1520,10 @@ function buildTypographyCopy(summary: SummaryModel) {
   const lines = ["Typography"];
   if (summary.fontFamilies.length > 0) {
     lines.push(`- Typefaces: ${summary.fontFamilies.join(", ")}`);
-    lines.push(`  Note: The preview above uses a system fallback font, not the actual typeface. Source ${summary.fontFamilies.join(", ")} separately to match the original.`);
+    for (const family of summary.fontFamilies) {
+      const status = buildFontPreviewStatus(family);
+      lines.push(`  - ${family}: ${status.copyLabel}`);
+    }
   }
   if (summary.h1) lines.push(`- Largest: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight} / ls ${summary.h1.letterSpacing}px`);
   if (summary.h2) lines.push(`- 2nd Largest: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight} / ls ${summary.h2.letterSpacing}px`);
@@ -1381,6 +1531,83 @@ function buildTypographyCopy(summary: SummaryModel) {
   if (summary.body) lines.push(`- Body range (14-20px): ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight} / ls ${summary.body.letterSpacing}px`);
   if (summary.caption) lines.push(`- Small text (<14px): ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight} / ls ${summary.caption.letterSpacing}px`);
   return lines.join("\n");
+}
+
+interface OpenSourceFontDefinition {
+  id: string;
+  family: string;
+  url: string;
+}
+
+const OPEN_SOURCE_FONT_REGISTRY: Record<string, OpenSourceFontDefinition> = {
+  inter: {
+    id: "inter",
+    family: "Inter",
+    url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+  },
+  sora: {
+    id: "sora",
+    family: "Sora",
+    url: "https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap"
+  },
+  "ibm plex sans": {
+    id: "ibm-plex-sans",
+    family: "IBM Plex Sans",
+    url: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+  },
+  "ibm plex serif": {
+    id: "ibm-plex-serif",
+    family: "IBM Plex Serif",
+    url: "https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600;700&display=swap"
+  },
+  "ibm plex mono": {
+    id: "ibm-plex-mono",
+    family: "IBM Plex Mono",
+    url: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap"
+  }
+};
+
+function buildTypographyPreviewNote(family: string): string {
+  return buildFontPreviewStatus(family).message;
+}
+
+function buildFontPreviewStatus(family: string): { message: string; copyLabel: string } {
+  const definition = getOpenSourceFontDefinition(family);
+  if (definition) {
+    return {
+      message: `${definition.family} is open source. This preview uses the actual font when it is available here.`,
+      copyLabel: "open-source font, preview uses the real typeface when available"
+    };
+  }
+
+  return {
+    message: `The typography shown here is not the site's actual font. ${family} is not verified open-source in this preview, so a fallback is used.`,
+    copyLabel: "not verified open-source, preview is fallback only"
+  };
+}
+
+function buildPreviewFontStack(family: string): string | undefined {
+  const definition = getOpenSourceFontDefinition(family);
+  if (!definition) {
+    return undefined;
+  }
+
+  return `"${definition.family}", "${family}", sans-serif`;
+}
+
+function getOpenSourceFontDefinition(family: string): OpenSourceFontDefinition | undefined {
+  const normalized = normalizeFontLookupKey(family);
+  return OPEN_SOURCE_FONT_REGISTRY[normalized];
+}
+
+function normalizeFontLookupKey(family: string): string {
+  return family
+    .split(",")[0]
+    .replace(/['"]/g, "")
+    .replace(/\bvariable\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function buildLayoutCopy(_summary: SummaryModel) {

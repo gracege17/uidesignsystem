@@ -752,6 +752,32 @@ test("extractDesignSystem: a single card-like element is not extracted (needs 2+
   assert.equal(cardComponents.length, 0, "a single card instance must be filtered out");
 });
 
+test("extractDesignSystem: repeated generic bordered containers are not promoted to Card", () => {
+  const result = extractDesignSystem([
+    {
+      source: "section.content-block",
+      tagName: "section",
+      childCount: 2,
+      width: 320,
+      height: 160,
+      display: "block",
+      borderColor: "rgb(226, 232, 240)"
+    },
+    {
+      source: "section.content-block-alt",
+      tagName: "section",
+      childCount: 2,
+      width: 320,
+      height: 160,
+      display: "block",
+      borderColor: "rgb(226, 232, 240)"
+    }
+  ]);
+
+  const cards = result.components.filter((component) => component.type === "Card");
+  assert.equal(cards.length, 0, "generic bordered sections must not be extracted as Card");
+});
+
 test("extractDesignSystem: two card elements produce exactly one Card component", () => {
   const result = extractDesignSystem([
     {
@@ -1045,6 +1071,32 @@ test("extractDesignSystem: Navigation captures cornerRadius and padding", () => 
   assert.equal(pad.left, 24);
 });
 
+test("extractDesignSystem: Navigation uses a stable top-nav name instead of hashed source text", () => {
+  const result = extractDesignSystem([
+    {
+      source: "navigation/7418f11d",
+      tagName: "nav",
+      childCount: 4,
+      width: 1180,
+      height: 72,
+      display: "flex",
+      paddingTop: 16,
+      paddingRight: 24,
+      paddingBottom: 16,
+      paddingLeft: 24,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    }
+  ]);
+
+  const nav = result.components.find((component) => component.type === "Navigation");
+  assert.ok(nav, "Navigation must be detected");
+  assert.equal(nav.name, "navigation/top-nav");
+});
+
 test("extractDesignSystem: Navigation maps fill and stroke color tokens", () => {
   const result = extractDesignSystem([
     {
@@ -1233,10 +1285,15 @@ test("inferComponentType: element with ariaExpanded is classified as Accordion",
       source: "div.feature-trigger",
       tagName: "div",
       ariaExpanded: false,
+      textContent: "Payroll takes just a few clicks",
       childCount: 2,
       width: 720,
       height: 56,
       borderColor: "rgb(226, 232, 240)",
+      paddingTop: 16,
+      paddingRight: 20,
+      paddingBottom: 16,
+      paddingLeft: 20,
       fontFamily: "Inter, sans-serif",
       fontSize: 16,
       fontWeight: 600,
@@ -1249,6 +1306,23 @@ test("inferComponentType: element with ariaExpanded is classified as Accordion",
   assert.equal(accordions.length, 1, "element with ariaExpanded must be classified as Accordion");
 });
 
+test("extractDesignSystem: bare aria-expanded toggles are not promoted to Accordion", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.toggle",
+      tagName: "button",
+      ariaExpanded: false,
+      textContent: "Toggle",
+      childCount: 1,
+      width: 80,
+      height: 24
+    }
+  ]);
+
+  const accordions = result.components.filter((component) => component.type === "Accordion");
+  assert.equal(accordions.length, 0, "bare aria-expanded toggles must not be extracted as Accordion");
+});
+
 test("inferComponentType: element with ariaExpanded=true (open state) is also Accordion", () => {
   const result = extractDesignSystem([
     {
@@ -1256,10 +1330,14 @@ test("inferComponentType: element with ariaExpanded=true (open state) is also Ac
       tagName: "button",
       ariaExpanded: true,
       textContent: "Sync hours with payroll",
-      childCount: 1,
+      childCount: 2,
       width: 720,
       height: 56,
       borderColor: "rgb(226, 232, 240)",
+      paddingTop: 16,
+      paddingRight: 20,
+      paddingBottom: 16,
+      paddingLeft: 20,
       fontFamily: "Inter, sans-serif",
       fontSize: 16,
       fontWeight: 600,
@@ -1271,6 +1349,33 @@ test("inferComponentType: element with ariaExpanded=true (open state) is also Ac
   // ariaExpanded wins over the button tagName detection
   const accordions = result.components.filter((c) => c.type === "Accordion");
   assert.equal(accordions.length, 1, "button with ariaExpanded must be Accordion, not Button");
+});
+
+test("extractDesignSystem: menu-style aria-expanded triggers are not promoted to Accordion", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.radix-navigation-menu-trigger",
+      tagName: "button",
+      ariaExpanded: false,
+      textContent: "Product",
+      childCount: 2,
+      width: 132,
+      height: 40,
+      borderColor: "rgb(226, 232, 240)",
+      paddingTop: 8,
+      paddingRight: 12,
+      paddingBottom: 8,
+      paddingLeft: 12,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      lineHeight: 20,
+      letterSpacing: 0
+    }
+  ]);
+
+  const accordions = result.components.filter((component) => component.type === "Accordion");
+  assert.equal(accordions.length, 0, "menu-style aria-expanded triggers must not be extracted as Accordion");
 });
 
 test("inferComponentType: <a> with background but too many children is NOT a Button", () => {

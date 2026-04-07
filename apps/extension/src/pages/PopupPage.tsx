@@ -62,6 +62,18 @@ export default function PopupPage() {
         >
           Open Review Page
         </button>
+
+        <p className="pt-1 text-center text-xs text-slate-400">
+          Created by{" "}
+          <a
+            href="https://gracege.space"
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-slate-200 underline decoration-1 underline-offset-4 transition hover:text-white"
+          >
+            Grace Ge
+          </a>
+        </p>
       </section>
     </main>
   );

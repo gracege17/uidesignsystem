@@ -260,6 +260,7 @@ export interface AutoLayout {
 export type ComponentType =
   | "Button"
   | "Card"
+  | "NavigationItem"
   | "Input"
   | "Badge"
   | "Modal"
@@ -374,9 +375,25 @@ export interface ExtractedComponent extends ComponentBase {
    */
   padding?: Spacing;
   /**
+   * Width of the extracted component root in pixels, when available.
+   */
+  width?: PixelValue;
+  /**
+   * Height of the extracted component root in pixels, when available.
+   */
+  height?: PixelValue;
+  /**
    * Visible text content of the component, if present.
    */
   textContent?: string;
+  /**
+   * Nearest landmark ancestor of the component in the DOM.
+   */
+  landmark?: "nav" | "header" | "main" | "footer" | "aside";
+  /**
+   * Absolute vertical position on the page in pixels (rect.top + scrollY).
+   */
+  pageY?: number;
   /**
    * Nested child components extracted from the same subtree.
    */

@@ -51,6 +51,9 @@ export interface SerializedStyleNode {
   lineHeight?: number | string;
   letterSpacing?: number | string;
   textTransform?: TypographyToken["textTransform"];
+  landmark?: "nav" | "header" | "main" | "footer" | "aside";
+  pageY?: number;
+  position?: string;
 }
 
 interface ColorCandidate {
@@ -273,12 +276,7 @@ export function extractComponents(
 
   return candidates.map((candidate, index) => {
     const variants = inferComponentVariants(candidate.node);
-    const semanticStem = inferSemanticStem([candidate.node.source], "component");
-    const name = makeUniqueName(
-      `${candidate.type.toLowerCase()}/${semanticStem ?? candidate.type.toLowerCase()}`,
-      usedNames,
-      index + 1
-    );
+    const name = inferComponentName(candidate, usedNames, index + 1);
 
     return {
       id: `component-${String(index + 1).padStart(3, "0")}`,
@@ -294,9 +292,36 @@ export function extractComponents(
       autoLayout: inferAutoLayout(candidate.node),
       cornerRadius: normalizeLength(candidate.node.borderRadius) ?? undefined,
       padding: inferPadding(candidate.node),
-      textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })()
+      width: normalizeLength(candidate.node.width) ?? undefined,
+      height: normalizeLength(candidate.node.height) ?? undefined,
+      textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })(),
+      landmark: candidate.node.landmark,
+      pageY: candidate.node.pageY
     };
   });
+}
+
+function inferComponentName(
+  candidate: ComponentCandidate,
+  usedNames: Set<string>,
+  index: number
+): string {
+  const typeStem = candidate.type.toLowerCase();
+  const semanticStem = inferSemanticStem([candidate.node.source], "component");
+
+  if (candidate.type === "Navigation") {
+    return makeUniqueName(`navigation/top-nav`, usedNames, index);
+  }
+
+  if (candidate.type === "NavigationItem") {
+    return makeUniqueName(`navigation/top-nav-item`, usedNames, index);
+  }
+
+  return makeUniqueName(
+    `${typeStem}/${semanticStem ?? typeStem}`,
+    usedNames,
+    index
+  );
 }
 
 function collectComponentCandidates(nodes: SerializedStyleNode[]): ComponentCandidate[] {
@@ -345,17 +370,26 @@ function collectComponentCandidates(nodes: SerializedStyleNode[]): ComponentCand
 }
 
 function shouldKeepComponentCandidate(candidate: ComponentCandidate): boolean {
-  if (candidate.count > 1) {
-    return true;
+  switch (candidate.type) {
+    case "Button":
+      return hasButtonConfidence(candidate.node);
+    case "Input":
+      return hasInputConfidence(candidate.node);
+    case "Navigation":
+      return hasNavigationConfidence(candidate.node);
+    case "NavigationItem":
+      return hasNavigationItemConfidence(candidate.node);
+    case "Modal":
+      return hasModalConfidence(candidate.node);
+    case "Accordion":
+      return hasAccordionConfidence(candidate.node);
+    case "Card":
+      return hasCardConfidence(candidate.node, candidate.count);
+    case "Badge":
+      return hasBadgeConfidence(candidate.node, candidate.count);
+    default:
+      return false;
   }
-
-  return (
-    candidate.type === "Modal" ||
-    candidate.type === "Navigation" ||
-    candidate.type === "Accordion" ||
-    candidate.type === "Input" ||
-    candidate.type === "Button"
-  );
 }
 
 function isRootLevelNode(node: SerializedStyleNode): boolean {
@@ -384,12 +418,10 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     .join(" ")
     .toLowerCase();
 
-  // aria-expanded is a reliable accordion trigger signal — check it before button detection
-  // so that <button aria-expanded> is classified as Accordion, not Button.
   if (
     node.tagName === "details" ||
-    node.ariaExpanded !== undefined ||
-    /\b(accordion|disclosure|faq|expandable|collapsible)\b/.test(haystack)
+    /\b(accordion|disclosure|faq|expandable|collapsible)\b/.test(haystack) ||
+    isStrongAriaAccordionCandidate(node, haystack)
   ) {
     return "Accordion";
   }
@@ -399,6 +431,7 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
   const isButtonLikeAnchor =
     node.tagName === "a" &&
     Boolean(node.backgroundColor) &&
+    node.position !== "absolute" &&
     (node.height ?? 999) <= 80 &&
     (node.childCount ?? 999) <= 3 &&
     Boolean((node.textContent ?? "").trim());
@@ -422,6 +455,16 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     /\b(input|field|search|textarea|select)\b/.test(haystack)
   ) {
     return "Input";
+  }
+
+  // Links and buttons inside a <nav> landmark are nav items, not the nav container.
+  if (
+    node.landmark === "nav" &&
+    (node.tagName === "a" || node.tagName === "button" || node.role === "menuitem" || node.role === "tab") &&
+    Boolean((node.textContent ?? "").trim()) &&
+    (node.height ?? 999) <= 80
+  ) {
+    return "NavigationItem";
   }
 
   if (node.tagName === "nav" || /\b(nav|navigation|menu|tabs?)\b/.test(haystack)) {
@@ -454,6 +497,143 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
   }
 
   return "Unknown";
+}
+
+function hasButtonConfidence(node: SerializedStyleNode): boolean {
+  const tagName = (node.tagName ?? "").toLowerCase();
+  const source = buildComponentHaystack(node);
+  return (
+    tagName === "button" ||
+    /\b(btn|button|cta)\b/.test(source) ||
+    (tagName === "a" &&
+      Boolean(node.textContent?.trim()) &&
+      ((node.height ?? 0) > 0 && (node.height ?? 0) <= 80) &&
+      Boolean(node.backgroundColor || node.borderColor))
+  );
+}
+
+function hasInputConfidence(node: SerializedStyleNode): boolean {
+  const tagName = (node.tagName ?? "").toLowerCase();
+  const source = buildComponentHaystack(node);
+  return (
+    ["input", "textarea", "select"].includes(tagName) ||
+    /\b(input|field|search|textarea|select)\b/.test(source)
+  );
+}
+
+function hasNavigationConfidence(node: SerializedStyleNode): boolean {
+  const tagName = (node.tagName ?? "").toLowerCase();
+  const source = buildComponentHaystack(node);
+  return tagName === "nav" || /\b(nav|navigation|menu|tabs?)\b/.test(source);
+}
+
+function hasNavigationItemConfidence(node: SerializedStyleNode): boolean {
+  const tagName = (node.tagName ?? "").toLowerCase();
+  return (
+    node.landmark === "nav" &&
+    (tagName === "a" || tagName === "button" || node.role === "menuitem" || node.role === "tab") &&
+    Boolean((node.textContent ?? "").trim()) &&
+    (node.height ?? 999) <= 80
+  );
+}
+
+function hasModalConfidence(node: SerializedStyleNode): boolean {
+  const source = buildComponentHaystack(node);
+  return node.role === "dialog" || /\b(modal|dialog|drawer|sheet)\b/.test(source);
+}
+
+function hasAccordionConfidence(node: SerializedStyleNode): boolean {
+  const tagName = (node.tagName ?? "").toLowerCase();
+  const source = buildComponentHaystack(node);
+  if (
+    tagName === "details" ||
+    /\b(accordion|disclosure|faq|expandable|collapsible)\b/.test(source)
+  ) {
+    return true;
+  }
+
+  return isStrongAriaAccordionCandidate(node, source);
+}
+
+function isStrongAriaAccordionCandidate(node: SerializedStyleNode, haystack: string): boolean {
+  if (node.ariaExpanded === undefined) {
+    return false;
+  }
+
+  if (/\b(nav|menu|dropdown|popover|tooltip|dialog|drawer|sheet|select|tabs?)\b/.test(haystack)) {
+    return false;
+  }
+
+  const text = (node.textContent ?? "").trim();
+  const width = node.width ?? 0;
+  const height = node.height ?? 0;
+
+  return (
+    text.length >= 12 &&
+    text.length <= 120 &&
+    width >= 240 &&
+    height >= 40 &&
+    height <= 120 &&
+    (node.childCount ?? 0) >= 2 &&
+    Boolean(node.borderColor || node.boxShadow || hasPadding(node))
+  );
+}
+
+function hasCardConfidence(node: SerializedStyleNode, count: number): boolean {
+  if (count <= 1) {
+    return false;
+  }
+
+  const source = buildComponentHaystack(node);
+  if (/\b(card|panel|tile)\b/.test(source)) {
+    return true;
+  }
+
+  const hasContainment = Boolean(node.boxShadow || node.borderColor || node.backgroundColor);
+  const hasStructure =
+    (node.childCount ?? 0) >= 2 &&
+    (node.height ?? 0) >= 80 &&
+    (node.width ?? 0) >= 160 &&
+    (node.width ?? 0) < 900;
+  const hasBoxTreatment =
+    hasPadding(node) ||
+    (normalizeLength(node.borderRadius) ?? 0) >= 8 ||
+    Boolean(node.boxShadow);
+
+  return hasContainment && hasStructure && hasBoxTreatment;
+}
+
+function hasBadgeConfidence(node: SerializedStyleNode, count: number): boolean {
+  const source = buildComponentHaystack(node);
+  if (/\b(badge|chip|pill|tag)\b/.test(source)) {
+    return true;
+  }
+
+  return (
+    count > 1 &&
+    (node.height ?? 0) <= 36 &&
+    (normalizeLength(node.borderRadius) ?? 0) >= 12 &&
+    Boolean(node.textContent?.trim())
+  );
+}
+
+function hasPadding(node: SerializedStyleNode): boolean {
+  return [node.paddingTop, node.paddingRight, node.paddingBottom, node.paddingLeft].some(
+    (value) => (normalizeLength(value) ?? 0) > 0
+  );
+}
+
+function buildComponentHaystack(node: SerializedStyleNode): string {
+  return [
+    node.tagName,
+    node.role,
+    node.inputType,
+    node.href ? "link" : "",
+    node.source,
+    ...(node.classNames ?? [])
+  ]
+    .join(" ")
+    .toLowerCase();
 }
 
 function inferComponentVariants(node: SerializedStyleNode): ComponentVariants {
@@ -1039,6 +1219,7 @@ function tokenizeSource(source: string): string[] {
     .split(/[^a-zA-Z0-9]+/)
     .map((part) => part.trim().toLowerCase())
     .filter((part) => part.length > 1 && !/^\d+$/.test(part))
+    .filter((part) => !/^(?:[a-f0-9]{8,}|[a-z0-9]{12,})$/i.test(part))
     .filter((part) => !GENERIC_SOURCE_TERMS.has(part));
 }
 
