@@ -389,13 +389,14 @@ function TypographySection({
       <div className="space-y-8">
         {scale.map(({ role, token }) => (
           <div key={token.id} className={`border-t pt-6 ${ui.rule}`}>
-            <div className={`mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px_100px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>
+            <div className={`mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px_100px_80px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>
               <span>{role} — {token.fontFamily}</span>
               <span>Font Size</span>
               <span>Line Height</span>
               <span>Letter Space</span>
+              <span>Align</span>
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_100px_100px_100px] gap-4">
+            <div className="grid grid-cols-[minmax(0,1fr)_100px_100px_100px_80px] gap-4">
               <p
                 className={`pr-6 ${ui.headingText}`}
                 style={{
@@ -404,7 +405,8 @@ function TypographySection({
                   lineHeight: `${Math.min(token.lineHeight, 72)}px`,
                   fontWeight: token.fontWeight,
                   letterSpacing: `${token.letterSpacing}px`,
-                  textTransform: token.textTransform ?? "none"
+                  textTransform: token.textTransform ?? "none",
+                  textAlign: token.textAlign ?? "left"
                 }}
               >
                 The quick brown fox jumps over the lazy dog
@@ -412,6 +414,7 @@ function TypographySection({
               <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.fontSize}px</p>
               <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.lineHeight}px</p>
               <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.letterSpacing}px</p>
+              <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.textAlign ?? "left"}</p>
             </div>
           </div>
         ))}
@@ -1562,14 +1565,19 @@ function buildTypographyCopy(summary: SummaryModel) {
     lines.push(`- Typefaces: ${summary.fontFamilies.join(", ")}`);
     for (const family of summary.fontFamilies) {
       const status = buildFontPreviewStatus(family);
-      lines.push(`  - ${family}: ${status.copyLabel}`);
+      const alternatives = getFreeAlternatives(family);
+      if (alternatives.length > 0) {
+        lines.push(`  - ${family}: ${status.copyLabel} — free alternatives: ${alternatives.join(", ")}`);
+      } else {
+        lines.push(`  - ${family}: ${status.copyLabel}`);
+      }
     }
   }
-  if (summary.h1) lines.push(`- Largest: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight} / ls ${summary.h1.letterSpacing}px`);
-  if (summary.h2) lines.push(`- 2nd Largest: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight} / ls ${summary.h2.letterSpacing}px`);
-  if (summary.h3) lines.push(`- 3rd Largest: ${summary.h3.fontSize}px / ${summary.h3.lineHeight}px / weight ${summary.h3.fontWeight} / ls ${summary.h3.letterSpacing}px`);
-  if (summary.body) lines.push(`- Body range (14-20px): ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight} / ls ${summary.body.letterSpacing}px`);
-  if (summary.caption) lines.push(`- Small text (<14px): ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight} / ls ${summary.caption.letterSpacing}px`);
+  if (summary.h1) lines.push(`- Largest: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight} / ls ${summary.h1.letterSpacing}px / ${summary.h1.textAlign ?? "left"}`);
+  if (summary.h2) lines.push(`- 2nd Largest: ${summary.h2.fontSize}px / ${summary.h2.lineHeight}px / weight ${summary.h2.fontWeight} / ls ${summary.h2.letterSpacing}px / ${summary.h2.textAlign ?? "left"}`);
+  if (summary.h3) lines.push(`- 3rd Largest: ${summary.h3.fontSize}px / ${summary.h3.lineHeight}px / weight ${summary.h3.fontWeight} / ls ${summary.h3.letterSpacing}px / ${summary.h3.textAlign ?? "left"}`);
+  if (summary.body) lines.push(`- Body range (14-20px): ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight} / ls ${summary.body.letterSpacing}px / ${summary.body.textAlign ?? "left"}`);
+  if (summary.caption) lines.push(`- Small text (<14px): ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px / weight ${summary.caption.fontWeight} / ls ${summary.caption.letterSpacing}px / ${summary.caption.textAlign ?? "left"}`);
   return lines.join("\n");
 }
 
@@ -1607,6 +1615,45 @@ const OPEN_SOURCE_FONT_REGISTRY: Record<string, OpenSourceFontDefinition> = {
   }
 };
 
+const PAID_FONT_ALTERNATIVES: Record<string, string[]> = {
+  "circular": ["Inter", "Plus Jakarta Sans", "Satoshi"],
+  "circular std": ["Inter", "Plus Jakarta Sans", "Satoshi"],
+  "sf pro": ["Inter", "Geist", "Outfit"],
+  "sf pro display": ["Inter", "Geist", "Outfit"],
+  "sf pro text": ["Inter", "Geist", "Outfit"],
+  "gt walsheim": ["General Sans", "Satoshi", "DM Sans"],
+  "gt walsheim pro": ["General Sans", "Satoshi", "DM Sans"],
+  "proxima nova": ["Montserrat", "Nunito Sans", "Source Sans 3"],
+  "graphik": ["Inter", "Manrope", "Switzer"],
+  "neue haas grotesk": ["Inter", "DM Sans", "Outfit"],
+  "neue haas grotesk display": ["Inter", "DM Sans", "Outfit"],
+  "futura": ["Jost", "Poppins", "Nunito"],
+  "futura pt": ["Jost", "Poppins", "Nunito"],
+  "avenir": ["Nunito", "Outfit", "Plus Jakarta Sans"],
+  "avenir next": ["Nunito", "Outfit", "Plus Jakarta Sans"],
+  "gotham": ["Montserrat", "Raleway", "Outfit"],
+  "gotham rounded": ["Nunito", "Varela Round", "Outfit"],
+  "gilroy": ["Outfit", "Plus Jakarta Sans", "General Sans"],
+  "apercu": ["DM Sans", "Karla", "Manrope"],
+  "suisse int'l": ["Inter", "Switzer", "DM Sans"],
+  "suisse intl": ["Inter", "Switzer", "DM Sans"],
+  "brandon grotesque": ["Raleway", "Josefin Sans", "Nunito"],
+  "neue montreal": ["General Sans", "Switzer", "Inter"],
+  "acumin pro": ["Source Sans 3", "Open Sans", "Nunito Sans"],
+  "freight sans": ["Libre Franklin", "Source Sans 3", "Nunito Sans"],
+  "museo sans": ["Nunito Sans", "Open Sans", "Lato"],
+  "din": ["DM Sans", "Barlow", "Roboto"],
+  "din next": ["DM Sans", "Barlow", "Roboto"],
+  "ff din": ["DM Sans", "Barlow", "Roboto"],
+  "helvetica": ["Inter", "DM Sans", "Outfit"],
+  "helvetica neue": ["Inter", "DM Sans", "Outfit"],
+};
+
+function getFreeAlternatives(family: string): string[] {
+  const key = normalizeFontLookupKey(family);
+  return PAID_FONT_ALTERNATIVES[key] ?? [];
+}
+
 function buildTypographyPreviewNote(family: string): string {
   return buildFontPreviewStatus(family).message;
 }
@@ -1617,6 +1664,14 @@ function buildFontPreviewStatus(family: string): { message: string; copyLabel: s
     return {
       message: `${definition.family} is open source. This preview uses the actual font when it is available here.`,
       copyLabel: "open-source font, preview uses the real typeface when available"
+    };
+  }
+
+  const alternatives = getFreeAlternatives(family);
+  if (alternatives.length > 0) {
+    return {
+      message: `${family} may require a license. Free alternatives: ${alternatives.join(", ")}. Preview uses a fallback font.`,
+      copyLabel: "may require license"
     };
   }
 
