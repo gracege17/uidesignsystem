@@ -792,7 +792,7 @@ function getComponentDisplayMeta(component: ExtractedComponent): {
   if (component.type === "Navigation") {
     return {
       title: "Top Nav",
-      subtitle: "Container · padding · gap",
+      subtitle: "Layout · width · gap · padding",
       badge: "top nav"
     };
   }
@@ -957,10 +957,25 @@ function ComponentPreview({
     const gap = component.autoLayout?.gap ?? 16;
 
     const specs: { label: string; value: string }[] = [];
+    if (component.width) specs.push({ label: "Width", value: `${component.width}px` });
+    if (component.height) specs.push({ label: "Height", value: `${component.height}px` });
+    if (component.autoLayout) {
+      const layout = component.autoLayout;
+      const parts = [layout.direction === "horizontal" ? "Row" : "Column"];
+      if (layout.primaryAlignment !== "start") parts.push(layout.primaryAlignment);
+      if (layout.counterAlignment !== "start") parts.push(`cross: ${layout.counterAlignment}`);
+      if (layout.wrap) parts.push("wrap");
+      specs.push({ label: "Layout", value: parts.join(" · ") });
+    }
+    if (component.autoLayout?.gap) specs.push({ label: "Gap", value: `${component.autoLayout.gap}px` });
+    if (fill) specs.push({ label: "Bg", value: colorToHex(fill) ?? fill });
+    if (text) specs.push({ label: "Color", value: colorToHex(text) ?? text });
     if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
     if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
     if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
-    if (component.autoLayout?.gap) specs.push({ label: "Gap", value: `${component.autoLayout.gap}px` });
+    if (component.position) specs.push({ label: "Position", value: component.position });
+    if (stroke) specs.push({ label: "Border", value: colorToHex(stroke) ?? stroke });
+    if (component.tokens.effects.length > 0) specs.push({ label: "Shadow", value: "yes" });
 
     return (
       <div className="space-y-4">
@@ -1011,11 +1026,22 @@ function ComponentPreview({
       theme
     );
     const pad = component.padding ?? component.autoLayout?.padding;
-    const label = component.textContent?.trim() || "Overview";
     const specs: { label: string; value: string }[] = [];
     if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${type.fontSize}px · ${type.fontWeight}` });
     if (pad) specs.push({ label: "Space", value: `${pad.top} · ${pad.right} · ${pad.bottom} · ${pad.left} px` });
     if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${component.cornerRadius}px` });
+
+    const itemStyle = {
+      color: itemText,
+      fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
+      fontSize: type ? `${Math.min(type.fontSize, 16)}px` : undefined,
+      fontWeight: type?.fontWeight,
+      borderRadius: component.cornerRadius !== undefined ? `${component.cornerRadius}px` : undefined,
+      ...(pad
+        ? { paddingTop: `${pad.top}px`, paddingRight: `${pad.right}px`, paddingBottom: `${pad.bottom}px`, paddingLeft: `${pad.left}px` }
+        : { padding: "8px 12px" }),
+      textDecoration: "none" as const
+    };
 
     return (
       <div className="space-y-4">
@@ -1023,20 +1049,9 @@ function ComponentPreview({
           href="#"
           className="inline-block text-sm"
           onClick={(e) => e.preventDefault()}
-          style={{
-            backgroundColor: itemBg === "transparent" ? undefined : itemBg,
-            color: itemText,
-            fontFamily: type ? `"${type.fontFamily}", sans-serif` : undefined,
-            fontSize: type ? `${Math.min(type.fontSize, 16)}px` : undefined,
-            fontWeight: type?.fontWeight,
-            borderRadius: component.cornerRadius !== undefined ? `${component.cornerRadius}px` : undefined,
-            ...(pad
-              ? { paddingTop: `${pad.top}px`, paddingRight: `${pad.right}px`, paddingBottom: `${pad.bottom}px`, paddingLeft: `${pad.left}px` }
-              : { padding: "8px 12px" }),
-            textDecoration: "none"
-          }}
+          style={{ ...itemStyle, backgroundColor: itemBg === "transparent" ? undefined : itemBg }}
         >
-          {label}
+          Item 1
         </a>
         {showSpecs && specs.length > 0 && (
           <div className="space-y-1.5">

@@ -296,7 +296,8 @@ export function extractComponents(
       height: normalizeLength(candidate.node.height) ?? undefined,
       textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })(),
       landmark: candidate.node.landmark,
-      pageY: candidate.node.pageY
+      pageY: candidate.node.pageY,
+      position: candidate.node.position !== "static" ? candidate.node.position : undefined
     };
   });
 }
@@ -428,16 +429,27 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
 
   // <a> tags are only buttons when they look like one: small, few children, non-empty label.
   // A bare "has background" check catches nav links, hero banners, card wrappers — all noise.
+  // Links inside a <nav> landmark are navigation items, not buttons.
   const isButtonLikeAnchor =
     node.tagName === "a" &&
+    node.landmark !== "nav" &&
     Boolean(node.backgroundColor) &&
     node.position !== "absolute" &&
     (node.height ?? 999) <= 80 &&
     (node.childCount ?? 999) <= 3 &&
     Boolean((node.textContent ?? "").trim());
 
+  // Buttons inside a <nav> landmark are nav items unless they have a distinctive
+  // fill background (CTA signal like "Get started" / "Sign up").
+  const isNavButton =
+    node.tagName === "button" &&
+    node.landmark === "nav" &&
+    (!node.backgroundColor ||
+      node.backgroundColor === "rgba(0, 0, 0, 0)" ||
+      node.backgroundColor === "transparent");
+
   if (
-    node.tagName === "button" ||
+    (node.tagName === "button" && !isNavButton) ||
     /\b(btn|button|cta)\b/.test(haystack) ||
     isButtonLikeAnchor
   ) {
@@ -450,10 +462,7 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     return "Button";
   }
 
-  if (
-    ["input", "textarea", "select"].includes(node.tagName ?? "") ||
-    /\b(input|field|search|textarea|select)\b/.test(haystack)
-  ) {
+  if (["input", "textarea", "select"].includes(node.tagName ?? "")) {
     return "Input";
   }
 
@@ -475,11 +484,15 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     return "Modal";
   }
 
+  // Layout-utility class names (flex, row, col, grid, etc.) are not semantic card signals.
+  const isLayoutPrimitive = /^\w+\.(flex[-\w]*|row|col(umn)?|grid[-\w]*|container|wrapper|layout)(\.[\w-]+)*$/.test(node.source.toLowerCase());
+
   if (
     /\b(card|panel|tile)\b/.test(haystack) ||
     // Structural card signal: needs explicit containment (shadow OR border) PLUS
     // meaningful children AND a card-like aspect ratio (wider than tall, not a full-width strip).
-    (Boolean(node.boxShadow || node.borderColor) &&
+    (!isLayoutPrimitive &&
+      Boolean(node.boxShadow || node.borderColor) &&
       (node.childCount ?? 0) >= 2 &&
       (node.height ?? 0) >= 80 &&
       (node.width ?? 0) < 900)
@@ -514,11 +527,7 @@ function hasButtonConfidence(node: SerializedStyleNode): boolean {
 
 function hasInputConfidence(node: SerializedStyleNode): boolean {
   const tagName = (node.tagName ?? "").toLowerCase();
-  const source = buildComponentHaystack(node);
-  return (
-    ["input", "textarea", "select"].includes(tagName) ||
-    /\b(input|field|search|textarea|select)\b/.test(source)
-  );
+  return ["input", "textarea", "select"].includes(tagName);
 }
 
 function hasNavigationConfidence(node: SerializedStyleNode): boolean {
@@ -589,6 +598,12 @@ function hasCardConfidence(node: SerializedStyleNode, count: number): boolean {
     return true;
   }
 
+  // Layout-utility primitives (flex-row, col, grid, container…) are not cards.
+  const isLayoutPrimitive = /^\w+\.(flex[-\w]*|row|col(umn)?|grid[-\w]*|container|wrapper|layout)(\.[\w-]+)*$/.test(node.source.toLowerCase());
+  if (isLayoutPrimitive) {
+    return false;
+  }
+
   const hasContainment = Boolean(node.boxShadow || node.borderColor || node.backgroundColor);
   const hasStructure =
     (node.childCount ?? 0) >= 2 &&
@@ -644,11 +659,15 @@ function inferComponentVariants(node: SerializedStyleNode): ComponentVariants {
   if (hasStroke && !hasFill) {
     style = "outline";
   } else if (!hasFill && !hasStroke) {
-    // If text color is light/white, the element almost certainly sits on a
-    // colored fill that the serializer didn't capture (e.g. applied via
-    // pseudo-element or CSS class on a child). Treat as fill rather than ghost.
+    // If text color is light/white on a true button element, the element almost
+    // certainly sits on a colored fill that the serializer didn't capture (e.g.
+    // applied via pseudo-element or CSS class on a child). Treat as fill rather
+    // than ghost.  Exclude <a> links — white text on a dark nav bar is normal
+    // for ghost nav links, not evidence of a missing fill.
+    const tagName = (node.tagName ?? "").toLowerCase();
+    const isRealButton = tagName === "button" || node.role === "button";
     const textLuminance = getLuminanceFromColor(node.textColor);
-    style = textLuminance !== null && textLuminance > 0.7 ? "fill" : "ghost";
+    style = isRealButton && textLuminance !== null && textLuminance > 0.7 ? "fill" : "ghost";
   }
 
   const lowerSource = node.source.toLowerCase();

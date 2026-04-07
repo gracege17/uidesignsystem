@@ -395,6 +395,10 @@ export interface ExtractedComponent extends ComponentBase {
    */
   pageY?: number;
   /**
+   * CSS position value (sticky, fixed, relative, absolute, static).
+   */
+  position?: string;
+  /**
    * Nested child components extracted from the same subtree.
    */
   children?: ExtractedComponent[];

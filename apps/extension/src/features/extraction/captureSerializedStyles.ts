@@ -175,11 +175,12 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
   > => {
     // 1. Self padding — logical properties take precedence over physical ones in CSS layout.
     // When both are set, the browser uses the logical value, so we check logical first.
+    // Use ?? (not ||) so that a resolved 0 is kept rather than falling through.
     const selfPadding = {
-      paddingTop: parsePx(style.paddingBlockStart) || parsePx(style.paddingTop) || 0,
-      paddingRight: parsePx(style.paddingInlineEnd) || parsePx(style.paddingRight) || 0,
-      paddingBottom: parsePx(style.paddingBlockEnd) || parsePx(style.paddingBottom) || 0,
-      paddingLeft: parsePx(style.paddingInlineStart) || parsePx(style.paddingLeft) || 0
+      paddingTop: parsePx(style.paddingBlockStart) ?? parsePx(style.paddingTop) ?? 0,
+      paddingRight: parsePx(style.paddingInlineEnd) ?? parsePx(style.paddingRight) ?? 0,
+      paddingBottom: parsePx(style.paddingBlockEnd) ?? parsePx(style.paddingBottom) ?? 0,
+      paddingLeft: parsePx(style.paddingInlineStart) ?? parsePx(style.paddingLeft) ?? 0
     };
 
     if (
@@ -197,8 +198,11 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
       tagName === "button" ||
       element.getAttribute("role") === "button" ||
       (tagName === "a" && Boolean(element.textContent?.trim()));
+    // Nav elements also delegate padding to an inner wrapper (e.g. a flex container
+    // inside <nav> that sets the horizontal/vertical padding for the bar).
+    const isNavLike = tagName === "nav";
 
-    if (!isButtonLike || rect.width === 0 || rect.height === 0) {
+    if ((!isButtonLike && !isNavLike) || rect.width === 0 || rect.height === 0) {
       return {
         paddingTop: undefined,
         paddingRight: undefined,
@@ -207,14 +211,22 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
       };
     }
 
-    // 2. Check direct children only — many frameworks (Tailwind, MUI, Webflow)
-    //    apply padding to a single inner wrapper span rather than the button itself.
+    // 2. Check descendants (up to depth 2) — many frameworks (Tailwind, MUI, Webflow,
+    //    Notion) apply padding to an inner wrapper rather than the component itself.
+    //    Some sites nest one level deeper (e.g. <a> → <div> → <span style="padding:…">).
+    const candidates: HTMLElement[] = [];
     for (const child of Array.from(element.children).slice(0, 3)) {
-      const childStyle = window.getComputedStyle(child as HTMLElement);
-      const pt = parsePx(childStyle.paddingTop) ?? 0;
-      const pr = parsePx(childStyle.paddingRight) ?? 0;
-      const pb = parsePx(childStyle.paddingBottom) ?? 0;
-      const pl = parsePx(childStyle.paddingLeft) ?? 0;
+      candidates.push(child as HTMLElement);
+      for (const grandchild of Array.from(child.children).slice(0, 2)) {
+        candidates.push(grandchild as HTMLElement);
+      }
+    }
+    for (const candidate of candidates) {
+      const candidateStyle = window.getComputedStyle(candidate);
+      const pt = parsePx(candidateStyle.paddingTop) ?? 0;
+      const pr = parsePx(candidateStyle.paddingRight) ?? 0;
+      const pb = parsePx(candidateStyle.paddingBottom) ?? 0;
+      const pl = parsePx(candidateStyle.paddingLeft) ?? 0;
       if (pt + pr + pb + pl > 0) {
         return { paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl };
       }
