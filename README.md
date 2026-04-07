@@ -29,6 +29,59 @@ The review experience is split into:
 
 Each section also supports copy actions for curated summaries.
 
+## Install on Your Desktop
+
+Follow these steps to load Design Extractor as a local Chrome extension.
+
+### 1. Prerequisites
+
+Install the following tools if you don't already have them:
+
+- [Node.js 18+](https://nodejs.org/) — JavaScript runtime
+- [pnpm](https://pnpm.io/installation) — package manager (`npm install -g pnpm`)
+- Google Chrome or any Chromium-based browser
+
+### 2. Clone the Repository
+
+```bash
+git clone https://github.com/your-org/uidesignsystem.git
+cd uidesignsystem
+```
+
+### 3. Install Dependencies
+
+```bash
+pnpm install
+```
+
+### 4. Build the Extension
+
+```bash
+pnpm build
+```
+
+This generates the unpacked extension in `apps/extension/dist`.
+
+### 5. Load into Chrome
+
+1. Open Chrome and go to `chrome://extensions`
+2. Toggle on **Developer mode** (top-right corner)
+3. Click **Load unpacked**
+4. Select the `apps/extension/dist` folder inside this repo
+
+The **Design Extractor** icon will appear in your Chrome toolbar.
+
+### 6. Use It
+
+1. Navigate to any webpage you want to inspect
+2. Click the **Design Extractor** icon in the toolbar
+3. Click **Extract**
+4. Browse results in the popup, or click **Open Review Page** for the full review UI
+
+> **Note:** The extension does not work on `chrome://` pages, the Chrome Web Store, or other restricted browser pages. Use it on normal public or internal websites.
+
+---
+
 ## Workspace Structure
 
 ```text
