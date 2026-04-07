@@ -25,3 +25,6 @@ dist/
 
 # OS/editor noise
 .DS_Store
+
+# Claude Code local settings
+.claude/

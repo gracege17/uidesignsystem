@@ -44,7 +44,7 @@ Install the following tools if you don't already have them:
 ### 2. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/uidesignsystem.git
+git clone https://github.com/gracege17/uidesignsystem.git
 cd uidesignsystem
 ```
 
