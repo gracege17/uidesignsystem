@@ -1,0 +1,49 @@
+name: Build and Release Extension
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm build
+
+      - name: Package extension zip
+        run: |
+          cd apps/extension/dist
+          zip -r ../../../design-extractor.zip .
+          cd ../../..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: design-extractor.zip
+          body: |
+            ## Install
+
+            1. Download `design-extractor.zip` below
+            2. Unzip it
+            3. Open Chrome → `chrome://extensions`
+            4. Enable **Developer mode** (top right)
+            5. Click **Load unpacked** → select the unzipped folder
