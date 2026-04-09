@@ -41,6 +41,10 @@ export interface TokenBase {
    * Optional description generated during extraction.
    */
   description?: string;
+  /**
+   * Number of matched usages that contributed to this token.
+   */
+  usageCount?: number;
 }
 
 /**
@@ -112,6 +116,10 @@ export interface TypographyToken extends TokenBase {
    * Optional text transform extracted from CSS.
    */
   textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
+  /**
+   * Optional text alignment extracted from CSS.
+   */
+  textAlign?: "left" | "center" | "right" | "justify";
 }
 
 /**
@@ -394,6 +402,10 @@ export interface ExtractedComponent extends ComponentBase {
    * Absolute vertical position on the page in pixels (rect.top + scrollY).
    */
   pageY?: number;
+  /**
+   * CSS position value (sticky, fixed, relative, absolute, static).
+   */
+  position?: string;
   /**
    * Nested child components extracted from the same subtree.
    */

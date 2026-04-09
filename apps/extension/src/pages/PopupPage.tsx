@@ -14,8 +14,8 @@ export default function PopupPage() {
     setErrorMessage(null);
 
     try {
-      const nodes = await captureSerializedStyles();
-      const nextResult = extractDesignSystem(nodes);
+      const capture = await captureSerializedStyles();
+      const nextResult = extractDesignSystem(capture);
       await saveReviewResult(nextResult);
       setResult(nextResult);
     } catch (error) {
@@ -32,6 +32,9 @@ export default function PopupPage() {
         <h1 className="text-base font-semibold tracking-tight text-white">
           Design System Extractor
         </h1>
+        <p className="text-xs leading-5 text-slate-400">
+          Extract the current page, then copy a compact spec for Claude, Cursor, or any AI coding tool.
+        </p>
 
         {errorMessage && (
           <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs leading-5 text-rose-200">
@@ -41,7 +44,7 @@ export default function PopupPage() {
 
         {result && !errorMessage && (
           <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-            Extracted — open the review page to inspect.
+            Extraction complete. Open the review page and copy the prompt-ready spec.
           </p>
         )}
 
@@ -60,8 +63,12 @@ export default function PopupPage() {
           disabled={!result}
           className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-slate-900/80 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-white/30 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Open Review Page
+          Review & Copy Spec
         </button>
+
+        <p className="text-center text-[11px] leading-5 text-slate-500">
+          Fast flow: Extract, check the overview, then use <span className="font-medium text-slate-300">Copy Prompt-Ready Spec</span>.
+        </p>
 
         <p className="pt-1 text-center text-xs text-slate-400">
           Created by{" "}

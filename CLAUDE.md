@@ -15,6 +15,17 @@ Synthetic test data is acceptable only for edge-case / negative tests (e.g. "wha
 
 When reviewing UI, output, or design decisions, respond as a **designer** — evaluate visual hierarchy, spacing consistency, typography scale, color contrast, and component patterns. Prioritize design quality and user experience over implementation convenience.
 
+## Extraction Changes
+
+Any change to `captureSerializedStyles.ts` must be verified on at least one real page before pushing:
+
+1. Build the extension (`pnpm --filter extension build`).
+2. Reload the extension in Chrome (`chrome://extensions`).
+3. Run extraction on the target page.
+4. Open DevTools on the inspected page and manually check computed styles on the captured element to confirm the extracted value matches.
+
+If the extracted value differs from DevTools, treat it as a bug — not a data discrepancy.
+
 ## Git Pushes
 
 When the user asks to push changes to GitHub:

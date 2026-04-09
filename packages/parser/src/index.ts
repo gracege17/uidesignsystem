@@ -51,6 +51,7 @@ export interface SerializedStyleNode {
   lineHeight?: number | string;
   letterSpacing?: number | string;
   textTransform?: TypographyToken["textTransform"];
+  textAlign?: TypographyToken["textAlign"];
   landmark?: "nav" | "header" | "main" | "footer" | "aside";
   pageY?: number;
   position?: string;
@@ -61,6 +62,12 @@ interface ColorCandidate {
   value: string;
   count: number;
   sources: string[];
+  semanticNames: string[];
+}
+
+export interface ExtractionInput {
+  nodes?: SerializedStyleNode[];
+  cssVariables?: Record<string, string>;
 }
 
 interface TypographyCandidate {
@@ -70,6 +77,7 @@ interface TypographyCandidate {
   lineHeight: number;
   letterSpacing: number;
   textTransform: TypographyToken["textTransform"];
+  textAlignCounts: Record<string, number>;
   count: number;
   sources: string[];
 }
@@ -188,9 +196,10 @@ const PREFERRED_SOURCE_TERMS = [
 ];
 
 export function extractDesignSystem(
-  nodes: SerializedStyleNode[] = []
+  input: SerializedStyleNode[] | ExtractionInput = []
 ): { tokens: DesignTokens; components: ExtractedComponent[]; layout: LayoutMetrics } {
-  const tokens = extractTokens(nodes);
+  const { nodes, cssVariables } = normalizeExtractionInput(input);
+  const tokens = extractTokens(nodes, cssVariables);
   const components = extractComponents(nodes, tokens);
   const layout = extractLayoutMetrics(nodes);
   return { tokens, components, layout };
@@ -254,9 +263,12 @@ export function extractLayoutMetrics(nodes: SerializedStyleNode[]): LayoutMetric
   return { contentWidth, pageMargin, spacingScale, grid };
 }
 
-export function extractTokens(nodes: SerializedStyleNode[] = []): DesignTokens {
+export function extractTokens(
+  nodes: SerializedStyleNode[] = [],
+  cssVariables: Record<string, string> = {}
+): DesignTokens {
   const filteredNodes = nodes.filter((node) => !isRootLevelNode(node));
-  const colorCandidates = collectColorCandidates(filteredNodes);
+  const colorCandidates = collectColorCandidates(filteredNodes, cssVariables);
   const typographyCandidates = collectTypographyCandidates(filteredNodes);
   const effectCandidates = collectEffectCandidates(filteredNodes);
 
@@ -296,7 +308,8 @@ export function extractComponents(
       height: normalizeLength(candidate.node.height) ?? undefined,
       textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })(),
       landmark: candidate.node.landmark,
-      pageY: candidate.node.pageY
+      pageY: candidate.node.pageY,
+      position: candidate.node.position !== "static" ? candidate.node.position : undefined
     };
   });
 }
@@ -428,16 +441,27 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
 
   // <a> tags are only buttons when they look like one: small, few children, non-empty label.
   // A bare "has background" check catches nav links, hero banners, card wrappers — all noise.
+  // Links inside a <nav> landmark are navigation items, not buttons.
   const isButtonLikeAnchor =
     node.tagName === "a" &&
+    node.landmark !== "nav" &&
     Boolean(node.backgroundColor) &&
     node.position !== "absolute" &&
     (node.height ?? 999) <= 80 &&
     (node.childCount ?? 999) <= 3 &&
     Boolean((node.textContent ?? "").trim());
 
+  // Buttons inside a <nav> landmark are nav items unless they have a distinctive
+  // fill background (CTA signal like "Get started" / "Sign up").
+  const isNavButton =
+    node.tagName === "button" &&
+    node.landmark === "nav" &&
+    (!node.backgroundColor ||
+      node.backgroundColor === "rgba(0, 0, 0, 0)" ||
+      node.backgroundColor === "transparent");
+
   if (
-    node.tagName === "button" ||
+    (node.tagName === "button" && !isNavButton) ||
     /\b(btn|button|cta)\b/.test(haystack) ||
     isButtonLikeAnchor
   ) {
@@ -450,10 +474,7 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     return "Button";
   }
 
-  if (
-    ["input", "textarea", "select"].includes(node.tagName ?? "") ||
-    /\b(input|field|search|textarea|select)\b/.test(haystack)
-  ) {
+  if (["input", "textarea", "select"].includes(node.tagName ?? "")) {
     return "Input";
   }
 
@@ -475,11 +496,15 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     return "Modal";
   }
 
+  // Layout-utility class names (flex, row, col, grid, etc.) are not semantic card signals.
+  const isLayoutPrimitive = /^\w+\.(flex[-\w]*|row|col(umn)?|grid[-\w]*|container|wrapper|layout)(\.[\w-]+)*$/.test(node.source.toLowerCase());
+
   if (
     /\b(card|panel|tile)\b/.test(haystack) ||
     // Structural card signal: needs explicit containment (shadow OR border) PLUS
     // meaningful children AND a card-like aspect ratio (wider than tall, not a full-width strip).
-    (Boolean(node.boxShadow || node.borderColor) &&
+    (!isLayoutPrimitive &&
+      Boolean(node.boxShadow || node.borderColor) &&
       (node.childCount ?? 0) >= 2 &&
       (node.height ?? 0) >= 80 &&
       (node.width ?? 0) < 900)
@@ -514,11 +539,7 @@ function hasButtonConfidence(node: SerializedStyleNode): boolean {
 
 function hasInputConfidence(node: SerializedStyleNode): boolean {
   const tagName = (node.tagName ?? "").toLowerCase();
-  const source = buildComponentHaystack(node);
-  return (
-    ["input", "textarea", "select"].includes(tagName) ||
-    /\b(input|field|search|textarea|select)\b/.test(source)
-  );
+  return ["input", "textarea", "select"].includes(tagName);
 }
 
 function hasNavigationConfidence(node: SerializedStyleNode): boolean {
@@ -589,6 +610,12 @@ function hasCardConfidence(node: SerializedStyleNode, count: number): boolean {
     return true;
   }
 
+  // Layout-utility primitives (flex-row, col, grid, container…) are not cards.
+  const isLayoutPrimitive = /^\w+\.(flex[-\w]*|row|col(umn)?|grid[-\w]*|container|wrapper|layout)(\.[\w-]+)*$/.test(node.source.toLowerCase());
+  if (isLayoutPrimitive) {
+    return false;
+  }
+
   const hasContainment = Boolean(node.boxShadow || node.borderColor || node.backgroundColor);
   const hasStructure =
     (node.childCount ?? 0) >= 2 &&
@@ -644,11 +671,15 @@ function inferComponentVariants(node: SerializedStyleNode): ComponentVariants {
   if (hasStroke && !hasFill) {
     style = "outline";
   } else if (!hasFill && !hasStroke) {
-    // If text color is light/white, the element almost certainly sits on a
-    // colored fill that the serializer didn't capture (e.g. applied via
-    // pseudo-element or CSS class on a child). Treat as fill rather than ghost.
+    // If text color is light/white on a true button element, the element almost
+    // certainly sits on a colored fill that the serializer didn't capture (e.g.
+    // applied via pseudo-element or CSS class on a child). Treat as fill rather
+    // than ghost.  Exclude <a> links — white text on a dark nav bar is normal
+    // for ghost nav links, not evidence of a missing fill.
+    const tagName = (node.tagName ?? "").toLowerCase();
+    const isRealButton = tagName === "button" || node.role === "button";
     const textLuminance = getLuminanceFromColor(node.textColor);
-    style = textLuminance !== null && textLuminance > 0.7 ? "fill" : "ghost";
+    style = isRealButton && textLuminance !== null && textLuminance > 0.7 ? "fill" : "ghost";
   }
 
   const lowerSource = node.source.toLowerCase();
@@ -858,13 +889,28 @@ function findEffectTokenIds(tokens: EffectToken[], node: SerializedStyleNode): s
     .filter((tokenId): tokenId is string => Boolean(tokenId));
 }
 
-function collectColorCandidates(nodes: SerializedStyleNode[]): ColorCandidate[] {
+function normalizeExtractionInput(input: SerializedStyleNode[] | ExtractionInput): Required<ExtractionInput> {
+  if (Array.isArray(input)) {
+    return { nodes: input, cssVariables: {} };
+  }
+
+  return {
+    nodes: input.nodes ?? [],
+    cssVariables: input.cssVariables ?? {}
+  };
+}
+
+function collectColorCandidates(
+  nodes: SerializedStyleNode[],
+  cssVariables: Record<string, string> = {}
+): ColorCandidate[] {
   const candidates = new Map<string, ColorCandidate>();
+  const semanticNamesByValue = buildSemanticColorNameIndex(cssVariables);
 
   for (const node of nodes) {
-    addColorCandidate(candidates, node.backgroundColor, "fill", node.source);
-    addColorCandidate(candidates, node.borderColor, "stroke", node.source);
-    addColorCandidate(candidates, node.textColor, "text", node.source);
+    addColorCandidate(candidates, node.backgroundColor, "fill", node.source, semanticNamesByValue);
+    addColorCandidate(candidates, node.borderColor, "stroke", node.source, semanticNamesByValue);
+    addColorCandidate(candidates, node.textColor, "text", node.source, semanticNamesByValue);
   }
 
   return Array.from(candidates.values());
@@ -888,14 +934,16 @@ function collectTypographyCandidates(nodes: SerializedStyleNode[]): TypographyCa
       typography.textTransform ?? "none"
     ].join("|");
 
+    const align = node.textAlign ?? "left";
     const existing = candidates.get(key);
     if (existing) {
       existing.count += 1;
       existing.sources.push(node.source);
+      existing.textAlignCounts[align] = (existing.textAlignCounts[align] ?? 0) + 1;
       continue;
     }
 
-    candidates.set(key, { ...typography, count: 1, sources: [node.source] });
+    candidates.set(key, { ...typography, textAlignCounts: { [align]: 1 }, count: 1, sources: [node.source] });
   }
 
   return Array.from(candidates.values());
@@ -948,10 +996,27 @@ function buildColorTokens(candidates: ColorCandidate[]): ColorToken[] {
         category: "color",
         role,
         value: candidate.value,
-        source: candidate.sources[0]
+        source: candidate.sources[0],
+        usageCount: candidate.count,
+        description:
+          candidate.semanticNames.length > 0
+            ? "from CSS variable"
+            : "inferred from DOM"
       };
     });
   });
+}
+
+function dominantTextAlign(counts: Record<string, number>): TypographyToken["textAlign"] {
+  let best: string = "left";
+  let bestCount = 0;
+  for (const [align, count] of Object.entries(counts)) {
+    if (count > bestCount) {
+      best = align;
+      bestCount = count;
+    }
+  }
+  return best as TypographyToken["textAlign"];
 }
 
 function buildTypographyTokens(candidates: TypographyCandidate[]): TypographyToken[] {
@@ -960,6 +1025,7 @@ function buildTypographyTokens(candidates: TypographyCandidate[]): TypographyTok
   const largestFontSize = candidates.reduce((max, c) => Math.max(max, c.fontSize), 0);
   const filtered = sortByPriority(candidates).filter((candidate) =>
     candidate.fontSize === largestFontSize ||
+    candidate.fontSize > 20 ||
     shouldKeepCandidate(candidate.count, candidates.length, "typography")
   );
   const usedNames = new Set<string>();
@@ -973,12 +1039,14 @@ function buildTypographyTokens(candidates: TypographyCandidate[]): TypographyTok
       name,
       category: "typography",
       source: candidate.sources[0],
+      usageCount: candidate.count,
       fontFamily: candidate.fontFamily,
       fontSize: candidate.fontSize,
       fontWeight: candidate.fontWeight,
       lineHeight: candidate.lineHeight,
       letterSpacing: candidate.letterSpacing,
-      textTransform: candidate.textTransform
+      textTransform: candidate.textTransform,
+      textAlign: dominantTextAlign(candidate.textAlignCounts)
     };
   });
 }
@@ -997,6 +1065,7 @@ function buildEffectTokens(candidates: EffectCandidate[]): EffectToken[] {
       id: `effect-${String(index + 1).padStart(3, "0")}`,
       name,
       category: "effect",
+      usageCount: candidate.count,
       style: candidate.style,
       color: candidate.color,
       offset: candidate.offset,
@@ -1011,7 +1080,8 @@ function addColorCandidate(
   candidates: Map<string, ColorCandidate>,
   value: string | undefined,
   role: ColorTokenRole,
-  source: string
+  source: string,
+  semanticNamesByValue: Map<string, string[]>
 ) {
   const normalizedValue = normalizeColor(value);
   if (!normalizedValue) {
@@ -1023,15 +1093,26 @@ function addColorCandidate(
   if (existing) {
     existing.count += 1;
     existing.sources.push(source);
+    for (const semanticName of semanticNamesByValue.get(normalizedValue) ?? []) {
+      if (!existing.semanticNames.includes(semanticName)) {
+        existing.semanticNames.push(semanticName);
+      }
+    }
     return;
   }
 
-  candidates.set(key, { role, value: normalizedValue, count: 1, sources: [source] });
+  candidates.set(key, {
+    role,
+    value: normalizedValue,
+    count: 1,
+    sources: [source],
+    semanticNames: [...(semanticNamesByValue.get(normalizedValue) ?? [])]
+  });
 }
 
 function parseTypographyCandidate(
   node: SerializedStyleNode
-): Omit<TypographyCandidate, "count" | "sources"> | null {
+): Omit<TypographyCandidate, "count" | "sources" | "textAlignCounts"> | null {
   if (!node.fontFamily) {
     return null;
   }
@@ -1143,6 +1224,11 @@ function parseShadow(input: string): Omit<EffectCandidate, "count" | "sources"> 
 }
 
 function inferColorName(candidate: ColorCandidate): string {
+  const semanticFromVariable = candidate.semanticNames[0];
+  if (semanticFromVariable) {
+    return semanticFromVariable;
+  }
+
   const valueStem = inferColorValueName(candidate.value, candidate.role);
   if (candidate.role === "text" && ["white", "inverse"].includes(valueStem)) {
     return valueStem;
@@ -1328,6 +1414,82 @@ function makeUniqueName(baseName: string, usedNames: Set<string>, index: number)
   return fallback;
 }
 
+function buildSemanticColorNameIndex(cssVariables: Record<string, string>): Map<string, string[]> {
+  const namesByValue = new Map<string, string[]>();
+
+  for (const [name, rawValue] of Object.entries(cssVariables)) {
+    if (!looksLikeColorVariable(name, rawValue)) {
+      continue;
+    }
+
+    const normalizedValue = normalizeColor(rawValue);
+    const semanticName = inferSemanticNameFromVariable(name);
+    if (!normalizedValue || !semanticName) {
+      continue;
+    }
+
+    const existing = namesByValue.get(normalizedValue) ?? [];
+    if (!existing.includes(semanticName)) {
+      existing.push(semanticName);
+    }
+    existing.sort((left, right) => semanticVariableWeight(right) - semanticVariableWeight(left));
+    namesByValue.set(normalizedValue, existing);
+  }
+
+  return namesByValue;
+}
+
+function looksLikeColorVariable(name: string, value: string): boolean {
+  if (!name.startsWith("--")) {
+    return false;
+  }
+
+  if (/(space|spacing|radius|size|width|height|font|shadow|blur|duration|timing|z-index|opacity)/i.test(name)) {
+    return false;
+  }
+
+  return normalizeColor(value) !== null;
+}
+
+function inferSemanticNameFromVariable(name: string): string | null {
+  const parts = name
+    .replace(/^--/, "")
+    .split(/[^a-zA-Z0-9]+/)
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part.length > 1)
+    .filter((part) => !/^\d+$/.test(part))
+    .filter((part) => !["color", "colors", "theme", "palette", "token", "tokens", "ui"].includes(part));
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  const ranked = parts
+    .filter((part) => !GENERIC_SOURCE_TERMS.has(part))
+    .sort((left, right) => {
+      const scoreDiff = semanticVariableWeight(right) - semanticVariableWeight(left);
+      if (scoreDiff !== 0) {
+        return scoreDiff;
+      }
+      return left.localeCompare(right);
+    });
+
+  const selected = (ranked.length > 0 ? ranked : parts).slice(0, 2);
+  return selected.length > 0 ? selected.join("-") : null;
+}
+
+function semanticVariableWeight(token: string): number {
+  if (["primary", "brand", "accent", "secondary", "muted", "surface", "background", "foreground", "text", "border", "inverse"].includes(token)) {
+    return 4;
+  }
+
+  if (PREFERRED_SOURCE_TERMS.includes(token)) {
+    return 3;
+  }
+
+  return 1;
+}
+
 function groupBy<T, K>(items: T[], getKey: (item: T) => K): Map<K, T[]> {
   const grouped = new Map<K, T[]>();
 
@@ -1367,6 +1529,11 @@ function normalizeColor(value: string | undefined): string | null {
     normalized === "rgba(0, 0, 0, 0)"
   ) {
     return null;
+  }
+
+  const channels = parseColorChannels(normalized);
+  if (channels) {
+    return `rgb(${channels.r}, ${channels.g}, ${channels.b})`;
   }
 
   return normalized;
