@@ -398,6 +398,12 @@ function shouldKeepComponentCandidate(candidate: ComponentCandidate): boolean {
       return hasAccordionConfidence(candidate.node);
     case "Card":
       return hasCardConfidence(candidate.node, candidate.count);
+    case "FeatureItem":
+      return hasFeatureItemConfidence(candidate.node, candidate.count);
+    case "ContentBlock":
+      return hasContentBlockConfidence(candidate.node, candidate.count);
+    case "ListItem":
+      return hasListItemConfidence(candidate.node, candidate.count);
     case "Badge":
       return hasBadgeConfidence(candidate.node, candidate.count);
     default:
@@ -468,7 +474,10 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     // Reject if the text looks like informational content, not an action label.
     // Real button labels are short, have no commas, and don't contain digits like IDs.
     const text = (node.textContent ?? "").trim();
-    if (text.length > 30 || text.includes(",") || /\d{4,}/.test(text)) {
+    if (text.length > 30 || text.includes(",") || /\d{4,}/.test(text) || text.includes("@")) {
+      return "Unknown";
+    }
+    if (node.href?.startsWith("mailto:") || node.href?.startsWith("tel:")) {
       return "Unknown";
     }
     return "Button";
@@ -498,18 +507,41 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
 
   // Layout-utility class names (flex, row, col, grid, etc.) are not semantic card signals.
   const isLayoutPrimitive = /^\w+\.(flex[-\w]*|row|col(umn)?|grid[-\w]*|container|wrapper|layout)(\.[\w-]+)*$/.test(node.source.toLowerCase());
+  const hasStructuredContent =
+    Boolean((node.textContent ?? "").trim()) &&
+    (node.childCount ?? 0) >= 2 &&
+    (node.height ?? 0) >= 48 &&
+    (node.width ?? 0) >= 120;
+  const hasContainment = Boolean(node.boxShadow || node.borderColor || node.backgroundColor);
+  const semanticTokens = tokenizeSource(haystack);
+  const sectionLikeWrapper = isSectionLikeWrapper(node, semanticTokens);
 
   if (
-    /\b(card|panel|tile)\b/.test(haystack) ||
-    // Structural card signal: needs explicit containment (shadow OR border) PLUS
-    // meaningful children AND a card-like aspect ratio (wider than tall, not a full-width strip).
-    (!isLayoutPrimitive &&
-      Boolean(node.boxShadow || node.borderColor) &&
-      (node.childCount ?? 0) >= 2 &&
-      (node.height ?? 0) >= 80 &&
-      (node.width ?? 0) < 900)
+    !isLayoutPrimitive &&
+    hasStructuredContent &&
+    looksLikeListItem(node, semanticTokens)
+  ) {
+    return "ListItem";
+  }
+
+  if (
+    !isLayoutPrimitive &&
+    hasStructuredContent &&
+    looksLikeFeatureItem(node, semanticTokens)
+  ) {
+    return "FeatureItem";
+  }
+
+  if (
+    !isLayoutPrimitive &&
+    !sectionLikeWrapper &&
+    looksLikeCard(node, semanticTokens)
   ) {
     return "Card";
+  }
+
+  if (!isLayoutPrimitive && hasStructuredContent && !sectionLikeWrapper) {
+    return "ContentBlock";
   }
 
   if (
@@ -601,12 +633,9 @@ function isStrongAriaAccordionCandidate(node: SerializedStyleNode, haystack: str
 }
 
 function hasCardConfidence(node: SerializedStyleNode, count: number): boolean {
-  if (count <= 1) {
-    return false;
-  }
-
   const source = buildComponentHaystack(node);
-  if (/\b(card|panel|tile)\b/.test(source)) {
+  const semanticTokens = tokenizeSource(source);
+  if (count > 1 && semanticTokens.some((token) => ["card", "panel", "tile"].includes(token))) {
     return true;
   }
 
@@ -621,13 +650,55 @@ function hasCardConfidence(node: SerializedStyleNode, count: number): boolean {
     (node.childCount ?? 0) >= 2 &&
     (node.height ?? 0) >= 80 &&
     (node.width ?? 0) >= 160 &&
-    (node.width ?? 0) < 900;
+    ((node.width ?? 0) < 900 || countLikeStrongSingleCard(node));
   const hasBoxTreatment =
     hasPadding(node) ||
     (normalizeLength(node.borderRadius) ?? 0) >= 8 ||
     Boolean(node.boxShadow);
 
-  return hasContainment && hasStructure && hasBoxTreatment;
+  return (count > 1 || countLikeStrongSingleCard(node)) && hasContainment && hasStructure && hasBoxTreatment;
+}
+
+function hasFeatureItemConfidence(node: SerializedStyleNode, count: number): boolean {
+  const source = buildComponentHaystack(node);
+  const hasStructuredText =
+    Boolean((node.textContent ?? "").trim()) &&
+    (node.childCount ?? 0) >= 2 &&
+    (node.width ?? 0) >= 120 &&
+    (node.height ?? 0) >= 48;
+  const semanticTokens = tokenizeSource(source);
+
+  return (
+    (count > 1 || looksLikeFeatureItem(node, semanticTokens)) &&
+    hasStructuredText &&
+    !looksLikeListItem(node, semanticTokens) &&
+    !looksLikeCard(node, semanticTokens)
+  );
+}
+
+function hasContentBlockConfidence(node: SerializedStyleNode, count: number): boolean {
+  const semanticTokens = tokenizeSource(buildComponentHaystack(node));
+  return (
+    count > 1 &&
+    Boolean((node.textContent ?? "").trim()) &&
+    (node.childCount ?? 0) >= 2 &&
+    (node.width ?? 0) >= 120 &&
+    (node.height ?? 0) >= 48 &&
+    !looksLikeFeatureItem(node, semanticTokens) &&
+    !looksLikeListItem(node, semanticTokens) &&
+    !looksLikeCard(node, semanticTokens) &&
+    !isSectionLikeWrapper(node, semanticTokens)
+  );
+}
+
+function hasListItemConfidence(node: SerializedStyleNode, count: number): boolean {
+  const semanticTokens = tokenizeSource(buildComponentHaystack(node));
+  return (
+    count > 1 &&
+    Boolean((node.textContent ?? "").trim()) &&
+    (node.childCount ?? 0) >= 2 &&
+    looksLikeListItem(node, semanticTokens)
+  );
 }
 
 function hasBadgeConfidence(node: SerializedStyleNode, count: number): boolean {
@@ -647,6 +718,101 @@ function hasBadgeConfidence(node: SerializedStyleNode, count: number): boolean {
 function hasPadding(node: SerializedStyleNode): boolean {
   return [node.paddingTop, node.paddingRight, node.paddingBottom, node.paddingLeft].some(
     (value) => (normalizeLength(value) ?? 0) > 0
+  );
+}
+
+function countLikeStrongSingleCard(node: SerializedStyleNode): boolean {
+  return (
+    visualContainmentScore(node) >= 3 &&
+    hasPadding(node) &&
+    (normalizeLength(node.borderRadius) ?? 0) >= 8 &&
+    (node.childCount ?? 0) >= 2 &&
+    (node.height ?? 0) >= 80 &&
+    (node.width ?? 0) >= 160
+  );
+}
+
+function visualContainmentScore(node: SerializedStyleNode): number {
+  let score = 0;
+  if (Boolean(normalizeColor(node.backgroundColor))) score += 1;
+  if (Boolean(normalizeColor(node.borderColor))) score += 1;
+  if (Boolean(node.boxShadow)) score += 1;
+  if ((normalizeLength(node.borderRadius) ?? 0) >= 8) score += 1;
+  if (hasPadding(node)) score += 1;
+  return score;
+}
+
+function looksLikeCard(node: SerializedStyleNode, semanticTokens: string[]): boolean {
+  const semanticCard = semanticTokens.some((token) => ["card", "panel", "tile"].includes(token));
+  const hasStructure =
+    (node.childCount ?? 0) >= 2 &&
+    (node.height ?? 0) >= 80 &&
+    (node.width ?? 0) >= 160 &&
+    ((node.width ?? 0) < 900 || countLikeStrongSingleCard(node));
+
+  if (semanticCard && (visualContainmentScore(node) >= 2 || countLikeStrongSingleCard(node))) {
+    return true;
+  }
+
+  return visualContainmentScore(node) >= 3 && hasStructure;
+}
+
+function looksLikeFeatureItem(node: SerializedStyleNode, semanticTokens: string[]): boolean {
+  return (
+    semanticTokens.some((token) =>
+      ["feature", "features", "benefit", "benefits", "value", "values", "why", "capability", "capabilities"].includes(token)
+    ) ||
+    (
+      semanticTokens.includes("item") &&
+      !looksLikeListItem(node, semanticTokens) &&
+      visualContainmentScore(node) <= 1
+    )
+  );
+}
+
+function looksLikeListItem(node: SerializedStyleNode, semanticTokens: string[]): boolean {
+  const mediaSignals = ["avatar", "speaker", "person", "profile", "member", "team", "logo", "author", "customer", "testimonial", "image", "img", "photo"];
+  const collectionSignals = ["list", "collection", "grid", "stack", "item", "speaker", "person", "profile", "member"];
+  return (
+    semanticTokens.some((token) => mediaSignals.includes(token)) ||
+    (
+      semanticTokens.some((token) => collectionSignals.includes(token)) &&
+      (node.width ?? 0) < 640
+    )
+  );
+}
+
+function isSectionLikeWrapper(node: SerializedStyleNode, semanticTokens: string[]): boolean {
+  const width = node.width ?? 0;
+  const height = node.height ?? 0;
+  const childCount = node.childCount ?? 0;
+  const lowSemanticSpecificity =
+    !semanticTokens.some((token) =>
+      [
+        "card",
+        "panel",
+        "tile",
+        "feature",
+        "features",
+        "benefit",
+        "benefits",
+        "speaker",
+        "profile",
+        "person",
+        "member",
+        "faq",
+        "accordion",
+        "nav",
+        "navigation"
+      ].includes(token)
+    );
+
+  return (
+    width >= 960 &&
+    height >= 160 &&
+    childCount >= 4 &&
+    visualContainmentScore(node) <= 2 &&
+    lowSemanticSpecificity
   );
 }
 

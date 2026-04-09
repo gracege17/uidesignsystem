@@ -121,6 +121,56 @@ test("extractTokens keeps effect tokens and semantic names for repeated shadows"
   assert.equal(tokens.effects[0].blurRadius, 40);
 });
 
+test("extractDesignSystem classifies repeated feature blocks as FeatureItem instead of Card", () => {
+  const result = extractDesignSystem([
+    {
+      source: "div.features_item",
+      tagName: "div",
+      classNames: ["features_item"],
+      textContent: "Curated No sponsored sessions. Every talk is reviewed by GTM operators to ensure real value for attendees.",
+      childCount: 2,
+      width: 280,
+      height: 120
+    },
+    {
+      source: "div.features_item",
+      tagName: "div",
+      classNames: ["features_item"],
+      textContent: "Practical Sessions built for operators, not vanity thought leadership.",
+      childCount: 2,
+      width: 280,
+      height: 120
+    }
+  ]);
+
+  assert.equal(result.components.some((component) => component.type === "FeatureItem"), true);
+  assert.equal(result.components.some((component) => component.type === "Card"), false);
+});
+
+test("extractDesignSystem keeps a strong single contained panel as Card", () => {
+  const result = extractDesignSystem([
+    {
+      source: "section.hero.panel",
+      tagName: "section",
+      classNames: ["hero", "panel"],
+      textContent: "Operator Summit Get practical GTM sessions with vetted speakers.",
+      childCount: 3,
+      width: 1120,
+      height: 360,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      boxShadow: "0px 24px 60px rgba(15, 23, 42, 0.16)",
+      borderRadius: 24,
+      paddingTop: 32,
+      paddingRight: 32,
+      paddingBottom: 32,
+      paddingLeft: 32
+    }
+  ]);
+
+  assert.equal(result.components.some((component) => component.type === "Card"), true);
+});
+
 test("extractTokens prefers matching CSS variable names for visible colors", () => {
   const tokens = extractTokens(
     [

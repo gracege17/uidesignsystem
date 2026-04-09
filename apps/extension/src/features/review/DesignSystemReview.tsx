@@ -394,7 +394,7 @@ function TypographySection({
             <div className={`mb-4 grid grid-cols-[minmax(0,1fr)_100px_100px_100px_80px] gap-4 text-[11px] uppercase tracking-[0.18em] ${ui.mutedText}`}>
               <span>{role} — {token.fontFamily}</span>
               <span>Font Size</span>
-              <span>Line Height</span>
+              <span>Line Height (ratio)</span>
               <span>Letter Space</span>
               <span>Align</span>
             </div>
@@ -413,8 +413,8 @@ function TypographySection({
               >
                 The quick brown fox jumps over the lazy dog
               </p>
-              <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.fontSize}px</p>
-              <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.lineHeight}px</p>
+              <p className={`pt-2 text-sm ${ui.bodyText}`}>{Math.round(token.fontSize)}px<span className={`ml-1 text-[11px] ${ui.mutedText}`}>({(token.fontSize / 16).toFixed(2)}rem)</span></p>
+              <p className={`pt-2 text-sm ${ui.bodyText}`}>{(token.lineHeight / token.fontSize).toFixed(2)}</p>
               <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.letterSpacing}px</p>
               <p className={`pt-2 text-sm ${ui.bodyText}`}>{token.textAlign ?? "left"}</p>
             </div>
@@ -822,6 +822,30 @@ function getComponentDisplayMeta(component: ExtractedComponent): {
       title: "Top Nav Item",
       subtitle: "Clickable link · inside top nav",
       badge: "top nav item"
+    };
+  }
+
+  if (component.type === "FeatureItem") {
+    return {
+      title: "Feature Item",
+      subtitle: "Repeated value prop or benefit block",
+      badge: "feature item"
+    };
+  }
+
+  if (component.type === "ContentBlock") {
+    return {
+      title: "Content Block",
+      subtitle: "Structured content group without card treatment",
+      badge: "content block"
+    };
+  }
+
+  if (component.type === "ListItem") {
+    return {
+      title: "List Item",
+      subtitle: "Repeated content item inside a list or grid",
+      badge: "list item"
     };
   }
 
@@ -2163,10 +2187,10 @@ function buildDesignMd(result: ExtractionResult, summary: SummaryModel): string 
   });
 
   if (typographyScale.length > 0) {
-    lines.push("| Token | Family | Size | Weight | Line-height | Letter-spacing | Align |");
+    lines.push("| Token | Family | Size | Weight | Line Height (ratio) | Letter-spacing | Align |");
     lines.push("|-------|--------|------|--------|-------------|----------------|-------|");
     for (const { role, token } of typographyScale) {
-      lines.push(`| ${role} | ${token.fontFamily} | ${token.fontSize}px | ${token.fontWeight} | ${token.lineHeight}px | ${token.letterSpacing}px | ${token.textAlign ?? "left"} |`);
+      lines.push(`| ${role} | ${token.fontFamily} | ${Math.round(token.fontSize)}px (${(token.fontSize / 16).toFixed(2)}rem) | ${token.fontWeight} | ${(token.lineHeight / token.fontSize).toFixed(2)} | ${token.letterSpacing}px | ${token.textAlign ?? "left"} |`);
     }
     lines.push("");
   }

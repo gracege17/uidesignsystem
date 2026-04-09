@@ -268,6 +268,9 @@ export interface AutoLayout {
 export type ComponentType =
   | "Button"
   | "Card"
+  | "FeatureItem"
+  | "ContentBlock"
+  | "ListItem"
   | "NavigationItem"
   | "Input"
   | "Badge"
