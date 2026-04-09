@@ -15,7 +15,7 @@
     "build": "tsc -p tsconfig.json",
     "lint": "tsc --noEmit -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "pnpm run build && node --test test/**/*.test.mjs"
+    "test": "pnpm --dir ../.. --filter @extractor/types build && pnpm run build && node --test test/**/*.test.mjs"
   },
   "dependencies": {
     "@extractor/types": "workspace:*"

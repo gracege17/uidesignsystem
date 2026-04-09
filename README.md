@@ -31,7 +31,22 @@ Each section also supports copy actions for curated summaries.
 
 ## Install on Your Desktop
 
-Follow these steps to load Design Extractor as a local Chrome extension.
+### Option A — Download (no setup required)
+
+1. Go to the [Releases page](https://github.com/gracege17/uidesignsystem/releases)
+2. Download `design-extractor.zip` from the latest release
+3. Unzip it
+4. Open Chrome → `chrome://extensions`
+5. Enable **Developer mode** (top-right corner)
+6. Click **Load unpacked** → select the unzipped folder
+
+The **Design Extractor** icon will appear in your Chrome toolbar.
+
+---
+
+### Option B — Build from source
+
+Follow these steps if you want to modify the extension or build it yourself.
 
 ### 1. Prerequisites
 
