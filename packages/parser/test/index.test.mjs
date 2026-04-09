@@ -121,6 +121,33 @@ test("extractTokens keeps effect tokens and semantic names for repeated shadows"
   assert.equal(tokens.effects[0].blurRadius, 40);
 });
 
+test("extractTokens prefers matching CSS variable names for visible colors", () => {
+  const tokens = extractTokens(
+    [
+      {
+        source: "button.cta",
+        backgroundColor: "rgb(26, 115, 232)",
+        textColor: "rgb(255, 255, 255)"
+      },
+      {
+        source: "a.link",
+        textColor: "rgb(26, 115, 232)"
+      }
+    ],
+    {
+      "--color-primary": "#1a73e8",
+      "--color-text": "#202124",
+      "--spacing-4": "16px"
+    }
+  );
+
+  assert.equal(tokens.colors.find((token) => token.role === "fill")?.name, "fill/primary");
+  assert.equal(
+    tokens.colors.find((token) => token.role === "text" && token.value === "rgb(26, 115, 232)")?.name,
+    "text/primary"
+  );
+});
+
 test("extractDesignSystem infers repeated components and maps token references", () => {
   const result = extractDesignSystem([
     {

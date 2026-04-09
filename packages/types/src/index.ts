@@ -41,6 +41,10 @@ export interface TokenBase {
    * Optional description generated during extraction.
    */
   description?: string;
+  /**
+   * Number of matched usages that contributed to this token.
+   */
+  usageCount?: number;
 }
 
 /**

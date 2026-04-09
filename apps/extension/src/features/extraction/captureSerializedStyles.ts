@@ -3,7 +3,12 @@ import { getExtensionApi } from "../storage/review-data";
 
 const browserApi = getExtensionApi();
 
-export async function captureSerializedStyles(): Promise<SerializedStyleNode[]> {
+export interface CapturedPageStyles {
+  nodes: SerializedStyleNode[];
+  cssVariables: Record<string, string>;
+}
+
+export async function captureSerializedStyles(): Promise<CapturedPageStyles> {
   if (!browserApi?.tabs?.query || !browserApi?.scripting) {
     return captureSerializedStylesFromDocument();
   }
@@ -18,15 +23,87 @@ export async function captureSerializedStyles(): Promise<SerializedStyleNode[]> 
     func: captureSerializedStylesFromDocument
   });
 
-  return (result?.result as SerializedStyleNode[] | undefined) ?? [];
+  return (
+    result?.result as CapturedPageStyles | undefined
+  ) ?? { nodes: [], cssVariables: {} };
 }
 
-function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
+function captureSerializedStylesFromDocument(): CapturedPageStyles {
   const GENERIC_TAGS = new Set(["html", "body", "main", "section", "div", "span"]);
+  const rootElement = document.documentElement;
+  const bodyElement = document.body;
 
   const parsePx = (value: string): number | undefined => {
     const numeric = Number.parseFloat(value);
     return Number.isFinite(numeric) ? Math.round(numeric * 100) / 100 : undefined;
+  };
+
+  const extractCSSVariables = (): Record<string, string> => {
+    const variables = new Map<string, string>();
+
+    const addVariable = (name: string, value: string, overwrite = false) => {
+      const trimmedName = name.trim();
+      const trimmedValue = value.trim();
+      if (!trimmedName.startsWith("--") || trimmedValue.length === 0) {
+        return;
+      }
+      if (overwrite || !variables.has(trimmedName)) {
+        variables.set(trimmedName, trimmedValue);
+      }
+    };
+
+    const collectFromStyle = (style: CSSStyleDeclaration, overwrite = false) => {
+      for (const property of Array.from(style)) {
+        if (property.startsWith("--")) {
+          addVariable(property, style.getPropertyValue(property), overwrite);
+        }
+      }
+    };
+
+    const matchesCurrentThemeScope = (selectorText: string): boolean => {
+      const selectors = selectorText
+        .split(",")
+        .map((selector) => selector.trim())
+        .filter(Boolean);
+
+      return selectors.some((selector) => {
+        if (selector === ":root" || selector === "html" || selector === "body") {
+          return true;
+        }
+
+        try {
+          return rootElement.matches(selector) || bodyElement.matches(selector);
+        } catch {
+          return false;
+        }
+      });
+    };
+
+    for (const sheet of Array.from(document.styleSheets)) {
+      try {
+        for (const rule of Array.from(sheet.cssRules)) {
+          if (!(rule instanceof CSSStyleRule)) {
+            continue;
+          }
+
+          const selector = rule.selectorText?.trim() ?? "";
+          if (!selector || !matchesCurrentThemeScope(selector)) {
+            continue;
+          }
+
+          collectFromStyle(rule.style, false);
+        }
+      } catch {
+        // Ignore cross-origin stylesheets that the extension cannot inspect.
+      }
+    }
+
+    // Computed styles resolve variable chains like `var(--blue-500)`, so they should
+    // overwrite raw stylesheet declarations when both are available.
+    collectFromStyle(window.getComputedStyle(rootElement), true);
+    collectFromStyle(window.getComputedStyle(bodyElement), true);
+
+    return Object.fromEntries(variables.entries());
   };
 
   const getElementSource = (element: HTMLElement): string => {
@@ -122,6 +199,12 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
     let score = 0;
     const tagName = element.tagName.toLowerCase();
     const text = element.textContent?.trim() ?? "";
+
+    if (["h1", "h2", "h3"].includes(tagName)) {
+      score += 18;
+    } else if (["h4", "h5", "h6"].includes(tagName)) {
+      score += 10;
+    }
 
     if (tagName === "button") {
       score += 12;
@@ -270,7 +353,7 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
   const maxNodes = 300;
   const elements = Array.from(document.querySelectorAll<HTMLElement>("*"));
 
-  return elements
+  const nodes = elements
     .map((element) => {
       const style = window.getComputedStyle(element);
       const rect = element.getBoundingClientRect();
@@ -427,4 +510,9 @@ function captureSerializedStylesFromDocument(): SerializedStyleNode[] {
     .sort((left, right) => right.priority - left.priority)
     .slice(0, maxNodes)
     .map((entry) => entry.snapshot);
+
+  return {
+    nodes,
+    cssVariables: extractCSSVariables()
+  };
 }

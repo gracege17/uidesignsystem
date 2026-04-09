@@ -77,7 +77,7 @@ export default function DesignSystemReview({
 
   return (
     <div className="space-y-12">
-      <SectionShell title="Overview" subtitle="Key extracted foundations and primary signals." theme={theme} copyLabel="Copy Everything" copied={copiedKey === "everything"} onCopy={() => void copySection("everything")}>
+      <SectionShell title="Overview" subtitle="Key extracted foundations and primary signals." theme={theme} copyLabel="Copy Prompt-Ready Spec" copied={copiedKey === "everything"} onCopy={() => void copySection("everything")} extraAction={{ label: "Export design.md", onClick: () => exportDesignMd(result, summary) }}>
         <OverviewSection result={result} summary={summary} theme={theme} />
       </SectionShell>
       <SectionShell title="Color Styles" subtitle="Color styles extracted from the page, grouped by role." theme={theme} copyLabel="Copy Color" copied={copiedKey === "color"} onCopy={() => void copySection("color")}>
@@ -113,7 +113,7 @@ function SplitSection({
 }) {
   if (tab === "overview") {
     return (
-      <SectionShell title="Overview" subtitle="Start here to identify the main design-system signals." theme={theme} copyLabel="Copy Everything" copied={copiedKey === "everything"} onCopy={() => void onCopy("everything")}>
+      <SectionShell title="Overview" subtitle="Start here to identify the main design-system signals." theme={theme} copyLabel="Copy Prompt-Ready Spec" copied={copiedKey === "everything"} onCopy={() => void onCopy("everything")} extraAction={{ label: "Export design.md", onClick: () => exportDesignMd(result, summary) }}>
         <OverviewSection result={result} summary={summary} theme={theme} />
       </SectionShell>
     );
@@ -294,7 +294,9 @@ function ColorSection({
                     {hex && hex !== token.value.toUpperCase() && (
                       <p className={`mt-0.5 text-[11px] font-mono ${ui.mutedText}`}>{token.value}</p>
                     )}
-                    <p className={`mt-2 truncate text-[11px] ${ui.mutedText}`}>{token.source}</p>
+                    <p className={`mt-2 truncate text-[11px] ${ui.mutedText}`}>
+                      {token.description ? `${token.description} · ${token.source}` : token.source}
+                    </p>
                   </div>
                 </div>
               );
@@ -548,21 +550,22 @@ function ComponentsSection({
 }) {
   const ui = getThemeClasses(theme);
   const STYLE_PRIORITY: Record<string, number> = { fill: 0, outline: 1, ghost: 2 };
-  const heroButtonSlots = pickHeroButtons(result.components);
+  const curatedComponents = filterNonFooterComponents(result.components);
+  const heroButtonSlots = pickHeroButtons(curatedComponents);
   const visibleHeroButtons = heroButtonSlots.filter(
     (entry): entry is FilledHeroButtonSlot => Boolean(entry.component)
   );
 
   // Pick the best Card representative (fill > outline > ghost)
   const baseCard =
-    result.components.find((c) => c.type === "Card" && c.variants.style === "fill") ??
-    result.components.find((c) => c.type === "Card");
+    curatedComponents.find((c) => c.type === "Card" && c.variants.style === "fill") ??
+    curatedComponents.find((c) => c.type === "Card");
 
   // For non-Button, non-Card families, pick the best fill representative
   const otherCurated = summary.componentFamilies
     .filter((family) => family.type !== "Button" && family.type !== "Card")
     .map((family) => {
-      const matches = result.components.filter((c) => c.type === family.type);
+      const matches = curatedComponents.filter((c) => c.type === family.type);
       return matches.sort(
         (a, b) =>
           (STYLE_PRIORITY[a.variants.style] ?? 9) - (STYLE_PRIORITY[b.variants.style] ?? 9)
@@ -693,7 +696,7 @@ function ComponentsSection({
 }
 
 function pickPrimaryButton(components: ExtractedComponent[]): ExtractedComponent | undefined {
-  const buttons = components.filter((component) => component.type === "Button");
+  const buttons = filterNonFooterComponents(components).filter((component) => component.type === "Button");
   if (buttons.length === 0) {
     return undefined;
   }
@@ -707,7 +710,7 @@ function pickPrimaryButton(components: ExtractedComponent[]): ExtractedComponent
 }
 
 function pickHeroButtons(components: ExtractedComponent[]): HeroButtonSlot[] {
-  const buttons = components.filter((component) => component.type === "Button");
+  const buttons = filterNonFooterComponents(components).filter((component) => component.type === "Button");
   if (buttons.length === 0) {
     return [];
   }
@@ -719,13 +722,27 @@ function pickHeroButtons(components: ExtractedComponent[]): HeroButtonSlot[] {
   const mainCta = ranked.find((component) => component.variants.style === "fill") ?? ranked[0];
   const remainingAfterMain = ranked.filter((component) => component.id !== mainCta?.id);
 
+  const mainPageY = mainCta?.pageY ?? 0;
   const secondaryCta =
-    remainingAfterMain.find((component) => component.variants.style === "outline") ??
-    remainingAfterMain[0];
+    remainingAfterMain.find(
+      (component) =>
+        component.variants.style === "outline" &&
+        Math.abs((component.pageY ?? 0) - mainPageY) < 400
+    ) ??
+    remainingAfterMain.find(
+      (component) =>
+        component.variants.style === "ghost" &&
+        Math.abs((component.pageY ?? 0) - mainPageY) < 200 &&
+        component.textContent?.trim() !== mainCta?.textContent?.trim()
+    );
   const remainingAfterSecondary = remainingAfterMain.filter(
     (component) => component.id !== secondaryCta?.id
   );
-  const otherButton = remainingAfterSecondary[0];
+  const otherButton = remainingAfterSecondary.find(
+    (component) =>
+      component.variants.style !== mainCta?.variants.style &&
+      component.variants.style !== secondaryCta?.variants.style
+  );
 
   return [
     { label: "Main CTA", component: mainCta },
@@ -1285,7 +1302,8 @@ function SectionShell({
   theme,
   copyLabel,
   copied,
-  onCopy
+  onCopy,
+  extraAction
 }: {
   title: string;
   subtitle: string;
@@ -1294,6 +1312,7 @@ function SectionShell({
   copyLabel: string;
   copied: boolean;
   onCopy: () => void;
+  extraAction?: { label: string; onClick: () => void };
 }) {
   const ui = getThemeClasses(theme);
   return (
@@ -1304,9 +1323,16 @@ function SectionShell({
             <h1 className={`text-5xl font-semibold tracking-tight ${ui.headingText}`}>{title}</h1>
             <p className={`mt-3 text-sm leading-6 ${ui.mutedText}`}>{subtitle}</p>
           </div>
-          <button type="button" onClick={onCopy} className={`shrink-0 rounded-full border px-4 py-2 text-sm transition ${ui.copyButton}`}>
-            {copied ? "Copied" : copyLabel}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {extraAction && (
+              <button type="button" onClick={extraAction.onClick} className={`rounded-full border px-4 py-2 text-sm transition ${ui.copyButton}`}>
+                {extraAction.label}
+              </button>
+            )}
+            <button type="button" onClick={onCopy} className={`rounded-full border px-4 py-2 text-sm transition ${ui.copyButton}`}>
+              {copied ? "Copied" : copyLabel}
+            </button>
+          </div>
         </div>
       </div>
       {children}
@@ -1335,27 +1361,34 @@ interface SummaryModel {
     neutral: DesignTokens["colors"];
     accent: DesignTokens["colors"];
   };
+  layout: LayoutMetrics;
 }
 
 function buildSummary(result: ExtractionResult): SummaryModel {
-  const typography = [...result.tokens.typography].sort((left, right) => right.fontSize - left.fontSize);
+  const typography = [...result.tokens.typography].sort(compareTypographyPriority);
   const fontFamilies = [...new Set(typography.map((t) => t.fontFamily))];
   const body = [...result.tokens.typography]
     .filter((token) => token.fontSize >= 14 && token.fontSize <= 20)
-    .sort((left, right) => Math.abs(left.fontSize - 16) - Math.abs(right.fontSize - 16))[0];
+    .sort((left, right) => {
+      const distanceDiff = Math.abs(left.fontSize - 16) - Math.abs(right.fontSize - 16);
+      if (distanceDiff !== 0) {
+        return distanceDiff;
+      }
+      return (right.usageCount ?? 0) - (left.usageCount ?? 0);
+    })[0];
   const caption = [...result.tokens.typography]
     .filter((token) => token.fontSize < 14)
-    .sort((left, right) => right.fontSize - left.fontSize)[0];
+    .sort(compareTypographyPriority)[0];
   // Headings must be > 20px so they never overlap with body or caption
   const headings = typography.filter((token) => token.fontSize > 20);
   const primaryColors = result.tokens.colors.filter(
     (token) => (token.role === "fill" || token.role === "text") && !isNeutralColor(token.value)
-  );
+  ).sort(comparePrimaryColorPriority);
   const neutralColors = result.tokens.colors.filter((token) => isNeutralColor(token.value));
   const accentColors = result.tokens.colors.filter(
     (token) => !primaryColors.includes(token) && !neutralColors.includes(token)
   );
-  const familyCounts = result.components.reduce<Record<string, number>>((accumulator, component) => {
+  const familyCounts = filterNonFooterComponents(result.components).reduce<Record<string, number>>((accumulator, component) => {
     accumulator[component.type] = (accumulator[component.type] ?? 0) + 1;
     return accumulator;
   }, {});
@@ -1376,8 +1409,55 @@ function buildSummary(result: ExtractionResult): SummaryModel {
       primary: primaryColors.slice(0, 4),
       neutral: neutralColors.slice(0, 5),
       accent: accentColors.slice(0, 6)
-    }
+    },
+    layout: result.layout
   };
+}
+
+function comparePrimaryColorPriority(
+  left: DesignTokens["colors"][number],
+  right: DesignTokens["colors"][number]
+) {
+  const rightSemantic = right.description === "from CSS variable" ? 1 : 0;
+  const leftSemantic = left.description === "from CSS variable" ? 1 : 0;
+  if (rightSemantic !== leftSemantic) {
+    return rightSemantic - leftSemantic;
+  }
+
+  const rightFill = right.role === "fill" ? 1 : 0;
+  const leftFill = left.role === "fill" ? 1 : 0;
+  if (rightFill !== leftFill) {
+    return rightFill - leftFill;
+  }
+
+  const usageDiff = (right.usageCount ?? 0) - (left.usageCount ?? 0);
+  if (usageDiff !== 0) {
+    return usageDiff;
+  }
+
+  return left.name.localeCompare(right.name);
+}
+
+function compareTypographyPriority(
+  left: DesignTokens["typography"][number],
+  right: DesignTokens["typography"][number]
+) {
+  const sizeDiff = right.fontSize - left.fontSize;
+  if (sizeDiff !== 0) {
+    return sizeDiff;
+  }
+
+  const usageDiff = (right.usageCount ?? 0) - (left.usageCount ?? 0);
+  if (usageDiff !== 0) {
+    return usageDiff;
+  }
+
+  return right.fontWeight - left.fontWeight;
+}
+
+function filterNonFooterComponents(components: ExtractedComponent[]) {
+  const nonFooter = components.filter((component) => component.landmark !== "footer");
+  return nonFooter.length > 0 ? nonFooter : components;
 }
 
 
@@ -1521,19 +1601,7 @@ function buildCopyText(key: ReviewTab | "everything", summary: SummaryModel, tok
   };
 
   if (key === "everything") {
-    return [
-      "Design System Summary",
-      "",
-      sections.overview,
-      "",
-      sections.color,
-      "",
-      sections.typography,
-      "",
-      sections.layout,
-      "",
-      sections.components
-    ].join("\n");
+    return buildPromptReadySpec(summary, tokens, components);
   }
 
   return sections[key];
@@ -1709,12 +1777,519 @@ function buildLayoutCopy(_summary: SummaryModel) {
   return "Spacing & Layout — see extension for spacing scale, content width, and grid details.";
 }
 
+function buildPromptReadySpec(
+  summary: SummaryModel,
+  tokens: DesignTokens,
+  components: ExtractedComponent[]
+) {
+  const lines = ["# Prompt-Ready Design Spec", ""];
+
+  const themeParagraph = buildVisualThemeParagraph(summary, tokens, components);
+  if (themeParagraph) {
+    lines.push("## Visual Theme");
+    lines.push(themeParagraph);
+    lines.push("");
+  }
+
+  const colorLines = buildPromptReadyColorLines(summary);
+  if (colorLines.length > 0) {
+    lines.push("## Color System");
+    lines.push(...colorLines);
+    lines.push("");
+  }
+
+  const typographyLines = buildPromptReadyTypographyLines(summary);
+  if (typographyLines.length > 0) {
+    lines.push("## Typography");
+    lines.push(...typographyLines);
+    lines.push("");
+  }
+
+  const componentLines = buildPromptReadyComponentLines(summary, tokens, components);
+  if (componentLines.length > 0) {
+    lines.push("## Components");
+    lines.push(...componentLines);
+    lines.push("");
+  }
+
+  const layoutLines = buildPromptReadyLayoutLines(summary);
+  if (layoutLines.length > 0) {
+    lines.push("## Layout");
+    lines.push(...layoutLines);
+    lines.push("");
+  }
+
+  const doLines = buildPromptReadyDoLines(summary, components);
+  if (doLines.length > 0) {
+    lines.push("## Do");
+    lines.push(...doLines);
+    lines.push("");
+  }
+
+  const dontLines = buildPromptReadyDontLines(summary, components);
+  if (dontLines.length > 0) {
+    lines.push("## Don't");
+    lines.push(...dontLines);
+    lines.push("");
+  }
+
+  lines.push("## Build Guidance");
+  lines.push(
+    "Recreate the same visual system and component feel rather than cloning the original page literally. Keep the hierarchy, spacing rhythm, color roles, and action emphasis consistent."
+  );
+
+  return lines.join("\n");
+}
+
+function buildVisualThemeParagraph(
+  summary: SummaryModel,
+  tokens: DesignTokens,
+  components: ExtractedComponent[]
+) {
+  const primary = summary.primaryColor ? describeColorMood(summary.primaryColor.value) : null;
+  const font = summary.fontFamilies[0]?.split(",")[0].trim();
+  const density = describeDensity(summary);
+  const primaryButton = pickPrimaryButton(components);
+  const representativeCard = pickRepresentativeCard(components);
+  const emphasis = primaryButton ? describeButtonEmphasis(primaryButton) : null;
+  const surface = representativeCard ? describeSurfaceFeel(representativeCard, tokens) : null;
+
+  const sentences = [
+    "A concise interface with a clear visual hierarchy and limited decorative noise.",
+    [primary, font ? `${font}-led typography` : null, density].filter(Boolean).join(", ") + ".",
+    [surface, emphasis].filter(Boolean).join(" ")
+  ]
+    .map((part) => part.trim())
+    .filter((part) => part && part !== ".");
+
+  return sentences.slice(0, 3).join(" ");
+}
+
+function buildPromptReadyColorLines(summary: SummaryModel) {
+  const lines: string[] = [];
+  const primary = summary.primaryColor;
+  const neutralSurface = summary.colorGroups.neutral[0];
+  const neutralText = summary.colorGroups.neutral[1];
+  const accent = summary.colorGroups.accent[0];
+
+  if (primary) {
+    lines.push(`- Primary: ${formatColorToken(primary)} used for actions and highlights.`);
+  }
+  if (neutralSurface) {
+    lines.push(`- Surface: ${formatColorToken(neutralSurface)} used for panels and quiet UI areas.`);
+  }
+  if (neutralText) {
+    lines.push(`- Text/Muted: ${formatColorToken(neutralText)} used for body copy, strokes, or secondary content.`);
+  }
+  if (accent) {
+    lines.push(`- Accent: ${formatColorToken(accent)} used sparingly for secondary emphasis.`);
+  }
+
+  return lines.slice(0, 4);
+}
+
+function buildPromptReadyTypographyLines(summary: SummaryModel) {
+  const lines: string[] = [];
+  const primaryFamily = summary.fontFamilies[0]?.split(",")[0].trim();
+
+  if (primaryFamily) {
+    lines.push(`- Primary typeface: ${primaryFamily}.`);
+  }
+  if (summary.h1) {
+    lines.push(
+      `- Heading style: ${summary.h1.fontSize}px / ${summary.h1.lineHeight}px / weight ${summary.h1.fontWeight}.`
+    );
+  }
+  if (summary.body) {
+    lines.push(
+      `- Body style: ${summary.body.fontSize}px / ${summary.body.lineHeight}px / weight ${summary.body.fontWeight}.`
+    );
+  }
+  if (summary.caption) {
+    lines.push(`- Small text: ${summary.caption.fontSize}px / ${summary.caption.lineHeight}px.`);
+  }
+
+  return lines.slice(0, 4);
+}
+
+function buildPromptReadyComponentLines(
+  summary: SummaryModel,
+  tokens: DesignTokens,
+  components: ExtractedComponent[]
+) {
+  const lines: string[] = [];
+  const primaryButton = pickPrimaryButton(components);
+  const card = pickRepresentativeCard(components);
+
+  if (primaryButton) {
+    const padding = primaryButton.padding ?? primaryButton.autoLayout?.padding;
+    const radius = primaryButton.cornerRadius !== undefined ? `${primaryButton.cornerRadius}px` : "fully rounded";
+    const spacing = padding
+      ? `${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`
+      : "compact balanced padding";
+    lines.push(
+      `- Primary button: ${primaryButton.variants.style} style with ${radius} corners and ${spacing}.`
+    );
+  }
+
+  if (card) {
+    lines.push(`- Surface/card: ${describeSurfaceFeel(card, tokens)}`);
+  }
+
+  const secondFamily = summary.componentFamilies.find(
+    (family) => family.type !== "Button" && family.type !== "Card"
+  );
+  if (secondFamily) {
+    lines.push(`- Repeated pattern: ${secondFamily.type.toLowerCase()} appears as a reusable supporting module.`);
+  }
+
+  return lines.slice(0, 4);
+}
+
+function buildPromptReadyLayoutLines(summary: SummaryModel) {
+  const lines: string[] = [];
+
+  if (summary.layout.contentWidth) {
+    lines.push(`- Content width: around ${summary.layout.contentWidth}px.`);
+  }
+  if (summary.layout.spacingScale.length > 0) {
+    lines.push(`- Spacing rhythm: mainly ${summary.layout.spacingScale.slice(0, 5).join(", ")}px.`);
+  }
+  lines.push(`- Density: ${describeDensity(summary)}.`);
+  if (summary.layout.grid) {
+    lines.push(`- Grid feel: structured ${summary.layout.grid.columns}-column layout with ${summary.layout.grid.gap}px gaps.`);
+  }
+
+  return lines.slice(0, 4);
+}
+
+function buildPromptReadyDoLines(summary: SummaryModel, components: ExtractedComponent[]) {
+  const lines: string[] = [];
+  const primary = summary.primaryColor ? colorToHex(summary.primaryColor.value) ?? summary.primaryColor.value : null;
+  const primaryButton = pickPrimaryButton(components);
+
+  if (primary) {
+    lines.push(`- Use ${primary} primarily for high-emphasis actions and active states.`);
+  }
+  if (summary.layout.spacingScale[0]) {
+    lines.push(`- Preserve the ${summary.layout.spacingScale[0]}px-based spacing rhythm across layouts and components.`);
+  }
+  if (summary.h1 && summary.body) {
+    lines.push(`- Keep strong hierarchy between ${summary.h1.fontSize}px headings and ${summary.body.fontSize}px body copy.`);
+  }
+  const buttonStyles = new Set(components.filter((c) => c.type === "Button").map((c) => c.variants.style));
+  if (primaryButton && buttonStyles.size > 1) {
+    lines.push(`- Keep primary actions ${primaryButton.variants.style} and visually more prominent than supporting actions.`);
+  }
+
+  return lines.slice(0, 4);
+}
+
+function buildPromptReadyDontLines(summary: SummaryModel, components: ExtractedComponent[]) {
+  const lines: string[] = ["- Do not introduce extra accent colors or decorative effects beyond the extracted core palette."];
+  const card = pickRepresentativeCard(components);
+
+  if (card?.cornerRadius !== undefined) {
+    lines.push(`- Do not make surfaces noticeably more rounded or sharper than the current ${card.cornerRadius}px card language.`);
+  }
+  if (summary.layout.spacingScale.length > 1) {
+    lines.push("- Do not drift away from the extracted spacing rhythm with inconsistent one-off gaps.");
+  }
+  lines.push("- Do not add dashboard-like visual noise if the extracted system feels restrained and editorial.");
+
+  return lines.slice(0, 4);
+}
+
+function formatColorToken(token: DesignTokens["colors"][number]) {
+  return `${token.name} (${colorToHex(token.value) ?? token.value})`;
+}
+
+function describeColorMood(value: string) {
+  const rgbMatch = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  const hex = colorToHex(value);
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (hex) {
+    r = Number.parseInt(hex.slice(1, 3), 16);
+    g = Number.parseInt(hex.slice(3, 5), 16);
+    b = Number.parseInt(hex.slice(5, 7), 16);
+  } else if (rgbMatch) {
+    r = Number(rgbMatch[1]);
+    g = Number(rgbMatch[2]);
+    b = Number(rgbMatch[3]);
+  } else {
+    return "one restrained accent color";
+  }
+
+  if (Math.abs(r - g) < 12 && Math.abs(g - b) < 12) {
+    return "a mostly neutral palette";
+  }
+
+  if (b >= r && b >= g) return "cool blue-led accents";
+  if (g >= r && g >= b) return "green-led accents";
+  if (r >= g && g >= b) return "warm red-orange accents";
+  if (r >= b && b >= g) return "magenta-purple accents";
+
+  return "one restrained accent color";
+}
+
+function describeDensity(summary: SummaryModel) {
+  const base = summary.layout.spacingScale[0];
+
+  if (!base) return "balanced density";
+  if (base <= 8) return "compact density";
+  if (base >= 20) return "spacious density";
+  return "balanced density";
+}
+
+function describeButtonEmphasis(component: ExtractedComponent) {
+  if (component.variants.style === "fill") {
+    return "Primary actions should feel solid and immediately visible.";
+  }
+  if (component.variants.style === "outline") {
+    return "Actions should stay crisp and restrained rather than heavily filled.";
+  }
+  return "Actions should stay visually light unless emphasis is necessary.";
+}
+
+function describeSurfaceFeel(component: ExtractedComponent, tokens: DesignTokens) {
+  const fill = tokens.colors.find((token) => component.tokens.fills.includes(token.id))?.value;
+  const stroke = tokens.colors.find((token) => component.tokens.strokes.includes(token.id))?.value;
+  const hasFill = Boolean(fill && fill !== "transparent" && fill !== "rgba(0, 0, 0, 0)");
+  const hasStroke = Boolean(stroke && stroke !== "transparent" && stroke !== "rgba(0, 0, 0, 0)");
+
+  if (hasFill && hasStroke) {
+    return "Filled surfaces with a visible boundary and restrained separation.";
+  }
+  if (hasFill) {
+    return "Filled surfaces with low visual noise and minimal extra ornament.";
+  }
+  if (hasStroke) {
+    return "Outlined surfaces with light separation instead of heavy elevation.";
+  }
+
+  return "Minimal surfaces with subtle separation.";
+}
+
+function pickRepresentativeCard(components: ExtractedComponent[]) {
+  return (
+    components.find((component) => component.type === "Card" && component.variants.style === "fill") ??
+    components.find((component) => component.type === "Card")
+  );
+}
+
+function exportDesignMd(result: ExtractionResult, summary: SummaryModel): void {
+  const md = buildDesignMd(result, summary);
+  const blob = new Blob([md], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "design.md";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildDesignMd(result: ExtractionResult, summary: SummaryModel): string {
+  const date = new Date().toISOString().split("T")[0];
+  const lines: string[] = [];
+  const curatedComponents = filterNonFooterComponents(result.components);
+
+  lines.push("# Design System Spec");
+  lines.push(`> Extracted: ${date}`);
+  lines.push("");
+  lines.push("---");
+  lines.push("");
+
+  // ── Colors ──────────────────────────────────────────────────────────────
+  lines.push("## Color Tokens");
+  lines.push("");
+
+  const { primary, neutral, accent } = summary.colorGroups;
+
+  if (primary.length > 0) {
+    lines.push("### Primary");
+    for (const token of primary) {
+      const hex = colorToHex(token.value) ?? token.value;
+      const comment = token.role === "fill" ? "brand fill" : token.role === "text" ? "brand text" : "brand stroke";
+      lines.push(`--${token.name}: ${hex}    /* ${comment} */`);
+    }
+    lines.push("");
+  }
+
+  if (neutral.length > 0) {
+    lines.push("### Neutral");
+    for (const token of neutral) {
+      const hex = colorToHex(token.value) ?? token.value;
+      lines.push(`--${token.name}: ${hex}`);
+    }
+    lines.push("");
+  }
+
+  if (accent.length > 0) {
+    lines.push("### Accent");
+    for (const token of accent) {
+      const hex = colorToHex(token.value) ?? token.value;
+      lines.push(`--${token.name}: ${hex}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("---");
+  lines.push("");
+
+  // ── Typography ───────────────────────────────────────────────────────────
+  lines.push("## Typography");
+  lines.push("");
+
+  if (summary.fontFamilies.length > 0) {
+    lines.push(`Font: ${summary.fontFamilies.join(", ")}`);
+    lines.push("");
+  }
+
+  const seenTypoIds = new Set<string>();
+  const typographyScale = [
+    summary.h1     ? { role: "display", token: summary.h1 }     : null,
+    summary.h2     ? { role: "h2",      token: summary.h2 }     : null,
+    summary.h3     ? { role: "h3",      token: summary.h3 }     : null,
+    summary.body   ? { role: "body",    token: summary.body }   : null,
+    summary.caption ? { role: "caption", token: summary.caption } : null,
+  ].filter((entry): entry is NonNullable<typeof entry> => {
+    if (!entry) return false;
+    if (seenTypoIds.has(entry.token.id)) return false;
+    seenTypoIds.add(entry.token.id);
+    return true;
+  });
+
+  if (typographyScale.length > 0) {
+    lines.push("| Token | Family | Size | Weight | Line-height | Letter-spacing | Align |");
+    lines.push("|-------|--------|------|--------|-------------|----------------|-------|");
+    for (const { role, token } of typographyScale) {
+      lines.push(`| ${role} | ${token.fontFamily} | ${token.fontSize}px | ${token.fontWeight} | ${token.lineHeight}px | ${token.letterSpacing}px | ${token.textAlign ?? "left"} |`);
+    }
+    lines.push("");
+  }
+
+  lines.push("---");
+  lines.push("");
+
+  // ── Spacing & Layout ────────────────────────────────────────────────────
+  lines.push("## Spacing & Layout");
+  lines.push("");
+
+  if (result.layout.spacingScale.length > 0) {
+    lines.push(`Scale: ${result.layout.spacingScale.slice(0, 8).join(", ")}px`);
+    lines.push("");
+  }
+
+  if (result.layout.contentWidth) lines.push(`--content-width: ${result.layout.contentWidth}px`);
+  if (result.layout.pageMargin)   lines.push(`--page-margin: ${result.layout.pageMargin}px`);
+  if (result.layout.grid) {
+    lines.push(`--grid-columns: ${result.layout.grid.columns}`);
+    lines.push(`--grid-gap: ${result.layout.grid.gap}px`);
+  }
+  lines.push("");
+  lines.push("---");
+  lines.push("");
+
+  // ── Components ──────────────────────────────────────────────────────────
+  lines.push("## Components");
+  lines.push("");
+
+  const STYLE_PRIORITY: Record<string, number> = { fill: 0, outline: 1, ghost: 2 };
+  const familyMap = new Map<string, ExtractedComponent[]>();
+  for (const c of curatedComponents) {
+    const list = familyMap.get(c.type) ?? [];
+    list.push(c);
+    familyMap.set(c.type, list);
+  }
+
+  const families = [...familyMap.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 6);
+
+  for (const [type, members] of families) {
+    const sorted = [...members].sort((a, b) => {
+      const styleDiff = (STYLE_PRIORITY[a.variants.style] ?? 9) - (STYLE_PRIORITY[b.variants.style] ?? 9);
+      if (styleDiff !== 0) return styleDiff;
+      if (a.variants.state === "default" && b.variants.state !== "default") return -1;
+      if (b.variants.state === "default" && a.variants.state !== "default") return 1;
+      return 0;
+    });
+    const rep = sorted[0];
+
+    const roleDesc =
+      type === "Button" && rep.variants.style === "fill"    ? "Primary CTA, highest visual priority" :
+      type === "Button" && rep.variants.style === "outline" ? "Secondary action, lower visual weight" :
+      type === "Button"                                     ? "Ghost action, minimal visual weight" :
+      type === "Card"                                       ? "Content container" :
+      type === "Navigation"                                 ? "Top navigation bar" :
+      type === "NavigationItem"                             ? "Navigation link item" :
+      type === "Input"                                      ? "Form text input" :
+      type === "Modal"                                      ? "Overlay dialog" :
+      type === "Accordion"                                  ? "Expandable content section" :
+      type === "Badge"                                      ? "Status label" : "Component";
+
+    lines.push(`### ${type} / ${rep.variants.style}`);
+    lines.push(`Role: ${roleDesc}`);
+    if (rep.textContent) lines.push(`Label: "${rep.textContent}"`);
+    lines.push("");
+
+    const fillToken   = result.tokens.colors.find((t) => rep.tokens.fills.includes(t.id));
+    const textToken   = result.tokens.colors.find((t) => rep.tokens.text.includes(t.id));
+    const strokeToken = result.tokens.colors.find((t) => rep.tokens.strokes.includes(t.id));
+    const typoToken   = result.tokens.typography.find((t) => rep.tokens.typography.includes(t.id));
+    const pad         = rep.padding ?? rep.autoLayout?.padding;
+
+    if (fillToken)                       lines.push(`  background: ${colorToHex(fillToken.value) ?? fillToken.value}`);
+    if (textToken)                       lines.push(`  color: ${colorToHex(textToken.value) ?? textToken.value}`);
+    if (strokeToken)                     lines.push(`  border: 1px solid ${colorToHex(strokeToken.value) ?? strokeToken.value}`);
+    if (rep.cornerRadius !== undefined)  lines.push(`  border-radius: ${rep.cornerRadius}px`);
+    if (pad)                             lines.push(`  padding: ${pad.top}px ${pad.right}px ${pad.bottom}px ${pad.left}px`);
+    if (typoToken)                       lines.push(`  font: ${typoToken.fontFamily} ${typoToken.fontSize}px / ${typoToken.fontWeight}`);
+    if (rep.width)                       lines.push(`  width: ${rep.width}px`);
+    if (rep.height)                      lines.push(`  height: ${rep.height}px`);
+    if (rep.autoLayout?.gap)             lines.push(`  gap: ${rep.autoLayout.gap}px`);
+
+    lines.push("");
+  }
+
+  // ── Agent Quick-Start ────────────────────────────────────────────────────
+  const primaryHex = summary.primaryColor ? (colorToHex(summary.primaryColor.value) ?? summary.primaryColor.value) : null;
+  const primaryFont = summary.fontFamilies[0]?.split(",")[0].trim() ?? null;
+  const primaryButton = pickPrimaryButton(curatedComponents);
+  const baseSpacing = result.layout.spacingScale[0] ?? null;
+
+  const quickTokens: string[] = [];
+  if (primaryHex) quickTokens.push(`Primary: ${primaryHex}`);
+  if (primaryFont) quickTokens.push(`Font: ${primaryFont}`);
+  if (primaryButton?.cornerRadius !== undefined) quickTokens.push(`Radius: ${primaryButton.cornerRadius}px`);
+  if (baseSpacing) quickTokens.push(`Spacing: ${baseSpacing}px base`);
+
+  if (quickTokens.length > 0) {
+    lines.push("---");
+    lines.push("");
+    lines.push("## Agent Quick-Start");
+    lines.push(quickTokens.join(" · "));
+    lines.push("");
+    const doLines = buildPromptReadyDoLines(summary, curatedComponents);
+    const dontLines = buildPromptReadyDontLines(summary, curatedComponents);
+    for (const line of doLines) lines.push(line);
+    for (const line of dontLines) lines.push(line);
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
 function buildComponentsCopy(components: ExtractedComponent[], tokens: DesignTokens) {
   const STYLE_PRIORITY: Record<string, number> = { fill: 0, outline: 1, ghost: 2 };
+  const curatedComponents = filterNonFooterComponents(components);
 
   // Group by type and pick the best representative per family
   const familyMap = new Map<string, ExtractedComponent[]>();
-  for (const c of components) {
+  for (const c of curatedComponents) {
     const list = familyMap.get(c.type) ?? [];
     list.push(c);
     familyMap.set(c.type, list);

@@ -62,6 +62,12 @@ interface ColorCandidate {
   value: string;
   count: number;
   sources: string[];
+  semanticNames: string[];
+}
+
+export interface ExtractionInput {
+  nodes?: SerializedStyleNode[];
+  cssVariables?: Record<string, string>;
 }
 
 interface TypographyCandidate {
@@ -190,9 +196,10 @@ const PREFERRED_SOURCE_TERMS = [
 ];
 
 export function extractDesignSystem(
-  nodes: SerializedStyleNode[] = []
+  input: SerializedStyleNode[] | ExtractionInput = []
 ): { tokens: DesignTokens; components: ExtractedComponent[]; layout: LayoutMetrics } {
-  const tokens = extractTokens(nodes);
+  const { nodes, cssVariables } = normalizeExtractionInput(input);
+  const tokens = extractTokens(nodes, cssVariables);
   const components = extractComponents(nodes, tokens);
   const layout = extractLayoutMetrics(nodes);
   return { tokens, components, layout };
@@ -256,9 +263,12 @@ export function extractLayoutMetrics(nodes: SerializedStyleNode[]): LayoutMetric
   return { contentWidth, pageMargin, spacingScale, grid };
 }
 
-export function extractTokens(nodes: SerializedStyleNode[] = []): DesignTokens {
+export function extractTokens(
+  nodes: SerializedStyleNode[] = [],
+  cssVariables: Record<string, string> = {}
+): DesignTokens {
   const filteredNodes = nodes.filter((node) => !isRootLevelNode(node));
-  const colorCandidates = collectColorCandidates(filteredNodes);
+  const colorCandidates = collectColorCandidates(filteredNodes, cssVariables);
   const typographyCandidates = collectTypographyCandidates(filteredNodes);
   const effectCandidates = collectEffectCandidates(filteredNodes);
 
@@ -879,13 +889,28 @@ function findEffectTokenIds(tokens: EffectToken[], node: SerializedStyleNode): s
     .filter((tokenId): tokenId is string => Boolean(tokenId));
 }
 
-function collectColorCandidates(nodes: SerializedStyleNode[]): ColorCandidate[] {
+function normalizeExtractionInput(input: SerializedStyleNode[] | ExtractionInput): Required<ExtractionInput> {
+  if (Array.isArray(input)) {
+    return { nodes: input, cssVariables: {} };
+  }
+
+  return {
+    nodes: input.nodes ?? [],
+    cssVariables: input.cssVariables ?? {}
+  };
+}
+
+function collectColorCandidates(
+  nodes: SerializedStyleNode[],
+  cssVariables: Record<string, string> = {}
+): ColorCandidate[] {
   const candidates = new Map<string, ColorCandidate>();
+  const semanticNamesByValue = buildSemanticColorNameIndex(cssVariables);
 
   for (const node of nodes) {
-    addColorCandidate(candidates, node.backgroundColor, "fill", node.source);
-    addColorCandidate(candidates, node.borderColor, "stroke", node.source);
-    addColorCandidate(candidates, node.textColor, "text", node.source);
+    addColorCandidate(candidates, node.backgroundColor, "fill", node.source, semanticNamesByValue);
+    addColorCandidate(candidates, node.borderColor, "stroke", node.source, semanticNamesByValue);
+    addColorCandidate(candidates, node.textColor, "text", node.source, semanticNamesByValue);
   }
 
   return Array.from(candidates.values());
@@ -971,7 +996,12 @@ function buildColorTokens(candidates: ColorCandidate[]): ColorToken[] {
         category: "color",
         role,
         value: candidate.value,
-        source: candidate.sources[0]
+        source: candidate.sources[0],
+        usageCount: candidate.count,
+        description:
+          candidate.semanticNames.length > 0
+            ? "from CSS variable"
+            : "inferred from DOM"
       };
     });
   });
@@ -995,6 +1025,7 @@ function buildTypographyTokens(candidates: TypographyCandidate[]): TypographyTok
   const largestFontSize = candidates.reduce((max, c) => Math.max(max, c.fontSize), 0);
   const filtered = sortByPriority(candidates).filter((candidate) =>
     candidate.fontSize === largestFontSize ||
+    candidate.fontSize > 20 ||
     shouldKeepCandidate(candidate.count, candidates.length, "typography")
   );
   const usedNames = new Set<string>();
@@ -1008,6 +1039,7 @@ function buildTypographyTokens(candidates: TypographyCandidate[]): TypographyTok
       name,
       category: "typography",
       source: candidate.sources[0],
+      usageCount: candidate.count,
       fontFamily: candidate.fontFamily,
       fontSize: candidate.fontSize,
       fontWeight: candidate.fontWeight,
@@ -1033,6 +1065,7 @@ function buildEffectTokens(candidates: EffectCandidate[]): EffectToken[] {
       id: `effect-${String(index + 1).padStart(3, "0")}`,
       name,
       category: "effect",
+      usageCount: candidate.count,
       style: candidate.style,
       color: candidate.color,
       offset: candidate.offset,
@@ -1047,7 +1080,8 @@ function addColorCandidate(
   candidates: Map<string, ColorCandidate>,
   value: string | undefined,
   role: ColorTokenRole,
-  source: string
+  source: string,
+  semanticNamesByValue: Map<string, string[]>
 ) {
   const normalizedValue = normalizeColor(value);
   if (!normalizedValue) {
@@ -1059,10 +1093,21 @@ function addColorCandidate(
   if (existing) {
     existing.count += 1;
     existing.sources.push(source);
+    for (const semanticName of semanticNamesByValue.get(normalizedValue) ?? []) {
+      if (!existing.semanticNames.includes(semanticName)) {
+        existing.semanticNames.push(semanticName);
+      }
+    }
     return;
   }
 
-  candidates.set(key, { role, value: normalizedValue, count: 1, sources: [source] });
+  candidates.set(key, {
+    role,
+    value: normalizedValue,
+    count: 1,
+    sources: [source],
+    semanticNames: [...(semanticNamesByValue.get(normalizedValue) ?? [])]
+  });
 }
 
 function parseTypographyCandidate(
@@ -1179,6 +1224,11 @@ function parseShadow(input: string): Omit<EffectCandidate, "count" | "sources"> 
 }
 
 function inferColorName(candidate: ColorCandidate): string {
+  const semanticFromVariable = candidate.semanticNames[0];
+  if (semanticFromVariable) {
+    return semanticFromVariable;
+  }
+
   const valueStem = inferColorValueName(candidate.value, candidate.role);
   if (candidate.role === "text" && ["white", "inverse"].includes(valueStem)) {
     return valueStem;
@@ -1364,6 +1414,82 @@ function makeUniqueName(baseName: string, usedNames: Set<string>, index: number)
   return fallback;
 }
 
+function buildSemanticColorNameIndex(cssVariables: Record<string, string>): Map<string, string[]> {
+  const namesByValue = new Map<string, string[]>();
+
+  for (const [name, rawValue] of Object.entries(cssVariables)) {
+    if (!looksLikeColorVariable(name, rawValue)) {
+      continue;
+    }
+
+    const normalizedValue = normalizeColor(rawValue);
+    const semanticName = inferSemanticNameFromVariable(name);
+    if (!normalizedValue || !semanticName) {
+      continue;
+    }
+
+    const existing = namesByValue.get(normalizedValue) ?? [];
+    if (!existing.includes(semanticName)) {
+      existing.push(semanticName);
+    }
+    existing.sort((left, right) => semanticVariableWeight(right) - semanticVariableWeight(left));
+    namesByValue.set(normalizedValue, existing);
+  }
+
+  return namesByValue;
+}
+
+function looksLikeColorVariable(name: string, value: string): boolean {
+  if (!name.startsWith("--")) {
+    return false;
+  }
+
+  if (/(space|spacing|radius|size|width|height|font|shadow|blur|duration|timing|z-index|opacity)/i.test(name)) {
+    return false;
+  }
+
+  return normalizeColor(value) !== null;
+}
+
+function inferSemanticNameFromVariable(name: string): string | null {
+  const parts = name
+    .replace(/^--/, "")
+    .split(/[^a-zA-Z0-9]+/)
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part.length > 1)
+    .filter((part) => !/^\d+$/.test(part))
+    .filter((part) => !["color", "colors", "theme", "palette", "token", "tokens", "ui"].includes(part));
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  const ranked = parts
+    .filter((part) => !GENERIC_SOURCE_TERMS.has(part))
+    .sort((left, right) => {
+      const scoreDiff = semanticVariableWeight(right) - semanticVariableWeight(left);
+      if (scoreDiff !== 0) {
+        return scoreDiff;
+      }
+      return left.localeCompare(right);
+    });
+
+  const selected = (ranked.length > 0 ? ranked : parts).slice(0, 2);
+  return selected.length > 0 ? selected.join("-") : null;
+}
+
+function semanticVariableWeight(token: string): number {
+  if (["primary", "brand", "accent", "secondary", "muted", "surface", "background", "foreground", "text", "border", "inverse"].includes(token)) {
+    return 4;
+  }
+
+  if (PREFERRED_SOURCE_TERMS.includes(token)) {
+    return 3;
+  }
+
+  return 1;
+}
+
 function groupBy<T, K>(items: T[], getKey: (item: T) => K): Map<K, T[]> {
   const grouped = new Map<K, T[]>();
 
@@ -1403,6 +1529,11 @@ function normalizeColor(value: string | undefined): string | null {
     normalized === "rgba(0, 0, 0, 0)"
   ) {
     return null;
+  }
+
+  const channels = parseColorChannels(normalized);
+  if (channels) {
+    return `rgb(${channels.r}, ${channels.g}, ${channels.b})`;
   }
 
   return normalized;

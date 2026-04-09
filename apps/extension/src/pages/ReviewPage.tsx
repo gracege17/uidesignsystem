@@ -78,8 +78,7 @@ export default function ReviewPage() {
             Extracted Design System
           </h1>
           <p className={`mt-3 max-w-2xl text-sm leading-6 ${theme === "light" ? "text-slate-600" : "text-slate-300"}`}>
-            Review the extracted system as a style guide with navigation on the left and the
-            active design surface on the right.
+            Start in Overview. Check the main signals, then copy the prompt-ready spec for your AI tool. Use the other tabs only if you want more detail.
           </p>
         </div>
 
