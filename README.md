@@ -244,6 +244,7 @@ This model is defined in [packages/types/src/index.ts](/Users/tianmeizige/uidesi
 - Button padding and corner radius are part of component identity. Do not group button candidates only by color, typography, and size.
 - Button padding may live on a nested wrapper instead of the clickable element itself, so extraction logic must not assume the first child carries the real spacing.
 - Treat computed browser values as observed evidence, not canonical spec values. Exported specs should snap spacing, radius, and typography measurements back to likely source tokens or the nearest approved scale.
+- Follow the builder-specific rules in [docs/extraction-rules.md](/Users/tianmeizige/uidesignsystem/docs/extraction-rules.md) so public design-system output stays semantic while Debug preserves implementation evidence.
 
 ## Current Limitations
 

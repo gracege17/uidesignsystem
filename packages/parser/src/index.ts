@@ -518,7 +518,11 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     // Reject if the text looks like informational content, not an action label.
     // Real button labels are short, have no commas, and don't contain digits like IDs.
     const text = (node.textContent ?? "").trim();
+    const lowerText = text.toLowerCase();
     if (text.length > 30 || text.includes(",") || /\d{4,}/.test(text) || text.includes("@")) {
+      return "Unknown";
+    }
+    if (["link", "menu"].includes(lowerText)) {
       return "Unknown";
     }
     if (node.href?.startsWith("mailto:") || node.href?.startsWith("tel:")) {

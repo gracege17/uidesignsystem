@@ -22,6 +22,22 @@ type HeroButtonSlotLabel = "Main CTA" | "Secondary CTA" | "Other Button";
 type HeroButtonSlot = { label: HeroButtonSlotLabel; component?: ExtractedComponent };
 type FilledHeroButtonSlot = { label: HeroButtonSlotLabel; component: ExtractedComponent };
 
+function formatTreatment(component: ExtractedComponent) {
+  if (component.variants.style !== "ghost") {
+    return component.variants.style;
+  }
+
+  if (component.type === "NavigationItem") {
+    return "text-only";
+  }
+
+  if (component.type === "Navigation" || component.type === "ContentBlock" || component.type === "ListItem" || component.type === "FeatureItem") {
+    return "transparent";
+  }
+
+  return "ghost";
+}
+
 export default function DesignSystemReview({
   result,
   layout = "stacked",
@@ -896,7 +912,7 @@ function DebugSection({
                 <div className="flex flex-wrap items-center gap-2">
                   <p className={`text-sm font-semibold ${ui.headingText}`}>{row.component.type}</p>
                   <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] ${ui.rule} ${ui.mutedText}`}>
-                    {row.component.variants.style} / {row.component.variants.size}
+                    {formatTreatment(row.component)} / {row.component.variants.size}
                   </span>
                   {row.component.variants.state !== "default" && (
                     <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] ${ui.rule} ${ui.mutedText}`}>
@@ -997,7 +1013,8 @@ function buildComponentDebugRow(component: ExtractedComponent, result: Extractio
 
   const decision: DebugField[] = [
     { label: "type", value: component.type },
-    { label: "variant", value: `${component.variants.style} / ${component.variants.size} / ${component.variants.state}` },
+    { label: "treatment", value: `${formatTreatment(component)} / ${component.variants.size} / ${component.variants.state}` },
+    { label: "raw style", value: component.variants.style },
     { label: "name", value: component.name },
     { label: "why", value: describeClassificationReason(component) },
     { label: "landmark", value: component.landmark ?? "none" },
@@ -1034,6 +1051,15 @@ function buildComponentDebugRow(component: ExtractedComponent, result: Extractio
         : "none"
     }
   ];
+
+  if (component.type === "Button") {
+    tokenMatches.push({
+      label: "style src",
+      value: fillTokens.length > 0
+        ? "self computed fill"
+        : "missing fill on captured element; inspect parent/child wrapper or pseudo-element"
+    });
+  }
 
   return {
     component,
@@ -1117,6 +1143,14 @@ function pickPrimaryButton(components: ExtractedComponent[]): ExtractedComponent
   return [...prioritized].sort((left, right) => scorePrimaryButton(right) - scorePrimaryButton(left))[0];
 }
 
+function isPrimaryActionLabel(label: string) {
+  return /\b(get started|start|try|sign up|signup|register|buy|book|demo|get tickets|contact sales|request|join|subscribe|create|launch)\b/i.test(label);
+}
+
+function isUtilityActionLabel(label: string) {
+  return /\b(sign in|signin|log in|login|docs|documentation|support|link|privacy|terms|menu)\b/i.test(label);
+}
+
 function pickHeroButtons(components: ExtractedComponent[]): HeroButtonSlot[] {
   const buttons = filterNonFooterComponents(components).filter((component) => component.type === "Button");
   if (buttons.length === 0) {
@@ -1161,6 +1195,7 @@ function pickHeroButtons(components: ExtractedComponent[]): HeroButtonSlot[] {
 
 function scorePrimaryButton(component: ExtractedComponent): number {
   let score = 0;
+  const label = component.textContent?.trim() ?? "";
 
   if (component.variants.state === "default") {
     score += 100;
@@ -1178,15 +1213,20 @@ function scorePrimaryButton(component: ExtractedComponent): number {
     score += 20;
   }
 
-  // Buttons higher on the page are more likely to be the primary CTA.
-  // pageY 0-200 covers nav + hero; 200-700 covers above-the-fold content.
+  if (component.landmark === "nav" || component.landmark === "header") {
+    score -= 120;
+  } else if (component.landmark === "footer") {
+    score -= 160;
+  }
+
+  // Hero/above-fold buttons are more likely to be primary than top-nav utility actions.
   if (component.pageY !== undefined) {
-    if (component.pageY <= 200) {
-      score += 80;
-    } else if (component.pageY <= 700) {
-      score += 50;
-    } else if (component.pageY <= 1400) {
+    if (component.pageY >= 96 && component.pageY <= 900) {
+      score += 120;
+    } else if (component.pageY > 0 && component.pageY < 96) {
       score += 20;
+    } else if (component.pageY <= 1400) {
+      score += 40;
     }
   }
 
@@ -1204,9 +1244,14 @@ function scorePrimaryButton(component: ExtractedComponent): number {
     score += (padding.top + padding.bottom) * 0.5;
   }
 
-  const label = component.textContent?.trim() ?? "";
   if (label.length > 0) {
     score += Math.min(label.length, 24);
+    if (isPrimaryActionLabel(label)) {
+      score += 140;
+    }
+    if (isUtilityActionLabel(label)) {
+      score -= 180;
+    }
   }
 
   return score;
@@ -1258,7 +1303,7 @@ function getComponentDisplayMeta(component: ExtractedComponent): {
   }
 
   const STYLE_LABEL_TYPES = new Set(["Button", "Card"]);
-  const styleLabel = STYLE_LABEL_TYPES.has(component.type) ? `${component.variants.style} · ` : "";
+  const styleLabel = STYLE_LABEL_TYPES.has(component.type) ? `${formatTreatment(component)} · ` : "";
   return {
     title: component.type,
     subtitle: `${styleLabel}${component.variants.size} · ${component.variants.state}`,
@@ -1303,12 +1348,13 @@ function ComponentPreview({
   );
 
   const padding = component.padding ?? component.autoLayout?.padding;
+  const previewPadding = padding ? clampPreviewPadding(canonicalSpacingBox(padding)) : undefined;
   const paddingStyle = padding
     ? {
-        paddingTop: `${padding.top}px`,
-        paddingRight: `${padding.right}px`,
-        paddingBottom: `${padding.bottom}px`,
-        paddingLeft: `${padding.left}px`
+        paddingTop: `${previewPadding?.top}px`,
+        paddingRight: `${previewPadding?.right}px`,
+        paddingBottom: `${previewPadding?.bottom}px`,
+        paddingLeft: `${previewPadding?.left}px`
       }
     : {};
 
@@ -1324,25 +1370,30 @@ function ComponentPreview({
   };
 
   if (component.type === "Button" || component.type === "Badge") {
-    const borderRadius = component.cornerRadius !== undefined ? `${component.cornerRadius}px` : "9999px";
+    const borderRadius = component.cornerRadius !== undefined ? `${canonicalRadiusValue(component.cornerRadius)}px` : "9999px";
     const pad = component.padding ?? component.autoLayout?.padding;
     const specs: { label: string; value: string }[] = [];
     if (type) specs.push({ label: "Font", value: `${type.fontFamily} · ${px(type.fontSize)}px · ${type.fontWeight}` });
     if (pad) {
-      specs.push({ label: "Padding", value: `${px(pad.top)} · ${px(pad.right)} · ${px(pad.bottom)} · ${px(pad.left)} px` });
+      specs.push({ label: "Padding", value: formatSpacingBox(pad) });
     } else if (component.height) {
       specs.push({ label: "Height", value: `${px(component.height)}px` });
     }
-    if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${px(component.cornerRadius)}px` });
+    if (component.cornerRadius !== undefined) specs.push({ label: "Corner", value: `${canonicalRadiusValue(component.cornerRadius)}px` });
     specs.push({ label: "Size", value: component.variants.size });
+    const previewLabel =
+      component.textContent && component.textContent.trim().length <= 24
+        ? component.textContent.trim()
+        : component.type;
     return (
       <div className="space-y-4">
         <button
           type="button"
-          className={`w-fit ${variantStyle === "ghost" ? "border-0" : "border"}${!padding ? " px-5 py-2.5" : ""}`}
-          style={{ ...style, borderRadius }}
+          className={`w-fit max-w-[220px] truncate ${variantStyle === "ghost" ? "border-0" : "border"}${!padding ? " px-5 py-2.5" : ""}`}
+          style={{ ...style, borderRadius, fontSize: type ? `${Math.min(type.fontSize, 16)}px` : undefined }}
+          title={component.textContent ?? component.source}
         >
-          Button
+          {previewLabel}
         </button>
         {showSpecs && specs.length > 0 && (
           <div className="space-y-1.5">
@@ -1996,6 +2047,27 @@ function formatSpacingBox(
   ].join("px ") + "px";
 }
 
+function canonicalSpacingBox(
+  spacing: { top: number; right: number; bottom: number; left: number },
+  spacingScale: number[] = []
+) {
+  return {
+    top: canonicalSpacingValue(spacing.top, spacingScale),
+    right: canonicalSpacingValue(spacing.right, spacingScale),
+    bottom: canonicalSpacingValue(spacing.bottom, spacingScale),
+    left: canonicalSpacingValue(spacing.left, spacingScale)
+  };
+}
+
+function clampPreviewPadding(spacing: { top: number; right: number; bottom: number; left: number }) {
+  return {
+    top: Math.min(spacing.top, 14),
+    right: Math.min(spacing.right, 22),
+    bottom: Math.min(spacing.bottom, 14),
+    left: Math.min(spacing.left, 22)
+  };
+}
+
 function formatCanonicalTypographyToken(
   token: {
     fontFamily: string;
@@ -2441,7 +2513,7 @@ function buildPromptReadyComponentLines(
       ? formatSpacingBox(padding, summary.layout.spacingScale)
       : "compact balanced padding";
     lines.push(
-      `- Primary button: ${primaryButton.variants.style} style with ${radius} corners and ${spacing}.`
+      `- Primary button: ${formatTreatment(primaryButton)} style with ${radius} corners and ${spacing}.`
     );
   }
 
@@ -2492,7 +2564,7 @@ function buildPromptReadyDoLines(summary: SummaryModel, components: ExtractedCom
   }
   const buttonStyles = new Set(components.filter((c) => c.type === "Button").map((c) => c.variants.style));
   if (primaryButton && buttonStyles.size > 1) {
-    lines.push(`- Keep primary actions ${primaryButton.variants.style} and visually more prominent than supporting actions.`);
+    lines.push(`- Keep primary actions ${formatTreatment(primaryButton)} and visually more prominent than supporting actions.`);
   }
 
   return lines.slice(0, 4);
@@ -2782,7 +2854,7 @@ function buildDesignMd(result: ExtractionResult, summary: SummaryModel): string 
       type === "Badge"                                      ? "Status label" : "Component";
 
     const showStyle = type === "Button" || type === "Card";
-    lines.push(`### ${type}${showStyle ? ` / ${rep.variants.style}` : ""}`);
+    lines.push(`### ${type}${showStyle ? ` / ${formatTreatment(rep)}` : ""}`);
     lines.push(`Role: ${roleDesc}`);
     if (rep.textContent) lines.push(`Label: "${rep.textContent}"`);
     lines.push("");
@@ -2889,20 +2961,26 @@ function buildComponentsCopy(components: ExtractedComponent[], tokens: DesignTok
 
   for (const [type, members] of families) {
     // Pick best representative: prefer fill + default state
-    const sorted = [...members].sort((a, b) => {
-      const styleDiff = (STYLE_PRIORITY[a.variants.style] ?? 9) - (STYLE_PRIORITY[b.variants.style] ?? 9);
-      if (styleDiff !== 0) return styleDiff;
-      if (a.variants.state === "default" && b.variants.state !== "default") return -1;
-      if (b.variants.state === "default" && a.variants.state !== "default") return 1;
-      return 0;
-    });
+    const sorted =
+      type === "Button"
+        ? [...members].sort((a, b) => scorePrimaryButton(b) - scorePrimaryButton(a))
+        : [...members].sort((a, b) => {
+            const styleDiff = (STYLE_PRIORITY[a.variants.style] ?? 9) - (STYLE_PRIORITY[b.variants.style] ?? 9);
+            if (styleDiff !== 0) return styleDiff;
+            if (a.variants.state === "default" && b.variants.state !== "default") return -1;
+            if (b.variants.state === "default" && a.variants.state !== "default") return 1;
+            return 0;
+          });
     const rep = sorted[0];
 
     lines.push("");
     lines.push(`${type}`);
+    if (rep.textContent && rep.textContent.trim().length <= 40) {
+      lines.push(`  label: "${rep.textContent.trim()}"`);
+    }
 
     // Style variant
-    lines.push(`  style: ${rep.variants.style}`);
+    lines.push(`  treatment: ${formatTreatment(rep)}`);
     lines.push(`  size: ${rep.variants.size}`);
 
     // Dimensions
