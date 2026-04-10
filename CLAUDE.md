@@ -25,6 +25,7 @@ Any change to `captureSerializedStyles.ts` must be verified on at least one real
 4. Open DevTools on the inspected page and manually check computed styles on the captured element to confirm the extracted value matches.
 
 If the extracted value differs from DevTools, treat it as a bug — not a data discrepancy.
+If the extracted value matches DevTools but contains subpixel decimals, do not promote that raw number into the design spec. Map it back to the source token or nearest approved scale before documenting it.
 
 ## Git Pushes
 

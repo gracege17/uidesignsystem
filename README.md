@@ -5,6 +5,7 @@ Prototype Chrome extension for extracting a page's design system and reviewing i
 The project currently focuses on:
 
 - extracting design tokens from live DOM and computed styles
+- normalizing extracted measurements back to likely source-token values before exporting a spec
 - inferring repeated component families from page structure
 - reviewing the result in a dedicated extension review page
 - exporting curated summaries for downstream AI or implementation tools
@@ -26,6 +27,7 @@ The review experience is split into:
 - `Typography`
 - `Grids`
 - `Components`
+- `Debug`
 
 Each section also supports copy actions for curated summaries.
 
@@ -173,6 +175,7 @@ The review page uses a left navigation and a main content area:
 - `Typography` shows likely type scale specimens
 - `Grids` visualizes repeated layout patterns
 - `Components` shows curated component families
+- `Debug` shows raw observed values, canonical values, token matches, classification reasons, and extraction warnings
 
 ## Copy Actions
 
@@ -183,6 +186,7 @@ The review page supports:
 - `Copy Typography`
 - `Copy Layout`
 - `Copy Components`
+- `Copy Debug`
 
 These exports are plain-text summaries designed to paste cleanly into AI tools, implementation prompts, or planning docs.
 
@@ -239,6 +243,7 @@ This model is defined in [packages/types/src/index.ts](/Users/tianmeizige/uidesi
 
 - Button padding and corner radius are part of component identity. Do not group button candidates only by color, typography, and size.
 - Button padding may live on a nested wrapper instead of the clickable element itself, so extraction logic must not assume the first child carries the real spacing.
+- Treat computed browser values as observed evidence, not canonical spec values. Exported specs should snap spacing, radius, and typography measurements back to likely source tokens or the nearest approved scale.
 
 ## Current Limitations
 

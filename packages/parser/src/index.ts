@@ -341,6 +341,10 @@ function collectComponentCandidates(nodes: SerializedStyleNode[]): ComponentCand
   const grouped = new Map<string, ComponentCandidate>();
 
   for (const node of nodes) {
+    if (isIgnoredComponentCandidate(node)) {
+      continue;
+    }
+
     const type = inferComponentType(node);
     if (type === "Unknown") {
       continue;
@@ -380,6 +384,32 @@ function collectComponentCandidates(nodes: SerializedStyleNode[]): ComponentCand
 
       return left.type.localeCompare(right.type);
     });
+}
+
+function isIgnoredComponentCandidate(node: SerializedStyleNode): boolean {
+  const width = normalizeLength(node.width) ?? 0;
+  const height = normalizeLength(node.height) ?? 0;
+  const pageY = typeof node.pageY === "number" ? node.pageY : 0;
+  const source = buildComponentHaystack(node);
+
+  if (pageY < -100 || node.position === "fixed" && pageY < 0) {
+    return true;
+  }
+
+  if (
+    node.tagName === "button" &&
+    height > 0 &&
+    height < 16 &&
+    width > 0 &&
+    width < 32 &&
+    !normalizeColor(node.backgroundColor) &&
+    !normalizeColor(node.textColor) &&
+    !normalizeColor(node.borderColor)
+  ) {
+    return true;
+  }
+
+  return /\b(cgw|captcha|recaptcha|grecaptcha|intercom|launcher|widget)\b/.test(source);
 }
 
 function shouldKeepComponentCandidate(candidate: ComponentCandidate): boolean {
@@ -457,6 +487,19 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     (node.childCount ?? 999) <= 3 &&
     Boolean((node.textContent ?? "").trim());
 
+  // Large CTAs (e.g. "Secure your spot") exceed the 80px height guard but are still buttons.
+  // Observed on sculpt.clay.com: h=96px, fill background, short label, ≤5 children.
+  const isLargeCta =
+    node.tagName === "a" &&
+    node.landmark !== "nav" &&
+    Boolean(node.backgroundColor) &&
+    node.position !== "absolute" &&
+    (node.height ?? 0) > 80 &&
+    (node.height ?? 0) <= 120 &&
+    (node.childCount ?? 999) <= 5 &&
+    (node.textContent ?? "").trim().length > 0 &&
+    (node.textContent ?? "").trim().length <= 30;
+
   // Buttons inside a <nav> landmark are nav items unless they have a distinctive
   // fill background (CTA signal like "Get started" / "Sign up").
   const isNavButton =
@@ -469,7 +512,8 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
   if (
     (node.tagName === "button" && !isNavButton) ||
     /\b(btn|button|cta)\b/.test(haystack) ||
-    isButtonLikeAnchor
+    isButtonLikeAnchor ||
+    isLargeCta
   ) {
     // Reject if the text looks like informational content, not an action label.
     // Real button labels are short, have no commas, and don't contain digits like IDs.
@@ -479,6 +523,20 @@ function inferComponentType(node: SerializedStyleNode): ComponentType {
     }
     if (node.href?.startsWith("mailto:") || node.href?.startsWith("tel:")) {
       return "Unknown";
+    }
+    // Anchor elements matched only via class name (not structural signals) must have a
+    // real visual treatment. Webflow/frameworks add `.button` classes to wrapper/clip
+    // elements that are transparent with near-zero padding — reject those.
+    // Observed on sculpt.clay.com: a.w-inline-block.button h=26px pad=2px, no fill/border.
+    if (node.tagName === "a" && !isButtonLikeAnchor && !isLargeCta) {
+      const hasPadding =
+        (normalizeLength(node.paddingLeft) ?? 0) > 4 ||
+        (normalizeLength(node.paddingRight) ?? 0) > 4 ||
+        (normalizeLength(node.paddingTop) ?? 0) > 4 ||
+        (normalizeLength(node.paddingBottom) ?? 0) > 4;
+      if (!node.backgroundColor && !node.borderColor && !node.textColor && !hasPadding) {
+        return "Unknown";
+      }
     }
     return "Button";
   }
@@ -564,7 +622,7 @@ function hasButtonConfidence(node: SerializedStyleNode): boolean {
     /\b(btn|button|cta)\b/.test(source) ||
     (tagName === "a" &&
       Boolean(node.textContent?.trim()) &&
-      ((node.height ?? 0) > 0 && (node.height ?? 0) <= 80) &&
+      ((node.height ?? 0) > 0 && (node.height ?? 0) <= 120) &&
       Boolean(node.backgroundColor || node.borderColor))
   );
 }
@@ -577,7 +635,10 @@ function hasInputConfidence(node: SerializedStyleNode): boolean {
 function hasNavigationConfidence(node: SerializedStyleNode): boolean {
   const tagName = (node.tagName ?? "").toLowerCase();
   const source = buildComponentHaystack(node);
-  return tagName === "nav" || /\b(nav|navigation|menu|tabs?)\b/.test(source);
+  return (
+    (tagName === "nav" || /\b(nav|navigation|menu|tabs?)\b/.test(source)) &&
+    (node.height ?? 0) > 0
+  );
 }
 
 function hasNavigationItemConfidence(node: SerializedStyleNode): boolean {
@@ -683,6 +744,7 @@ function hasContentBlockConfidence(node: SerializedStyleNode, count: number): bo
     Boolean((node.textContent ?? "").trim()) &&
     (node.childCount ?? 0) >= 2 &&
     (node.width ?? 0) >= 120 &&
+    (node.width ?? 0) < 900 &&  // Full-viewport-width elements are layout containers, not components
     (node.height ?? 0) >= 48 &&
     !looksLikeFeatureItem(node, semanticTokens) &&
     !looksLikeListItem(node, semanticTokens) &&
@@ -832,6 +894,10 @@ function buildComponentHaystack(node: SerializedStyleNode): string {
 function inferComponentVariants(node: SerializedStyleNode): ComponentVariants {
   const hasFill = Boolean(normalizeColor(node.backgroundColor));
   const hasStroke = Boolean(normalizeColor(node.borderColor));
+  const tagName = (node.tagName ?? "").toLowerCase();
+  const source = buildComponentHaystack(node);
+  const hasButtonSignal = /\b(btn|button|cta)\b/.test(source);
+  const hasColorModifier = /\bcc-[a-z0-9-]*(lime|dragonfruit|ube|tangerine|blueberry|pomegranate|lemon|slushie)[a-z0-9-]*\b/.test(source);
 
   let style: ComponentVariants["style"] = "fill";
   if (hasStroke && !hasFill) {
@@ -842,10 +908,10 @@ function inferComponentVariants(node: SerializedStyleNode): ComponentVariants {
     // applied via pseudo-element or CSS class on a child). Treat as fill rather
     // than ghost.  Exclude <a> links — white text on a dark nav bar is normal
     // for ghost nav links, not evidence of a missing fill.
-    const tagName = (node.tagName ?? "").toLowerCase();
     const isRealButton = tagName === "button" || node.role === "button";
     const textLuminance = getLuminanceFromColor(node.textColor);
-    style = isRealButton && textLuminance !== null && textLuminance > 0.7 ? "fill" : "ghost";
+    const isColorCtaAnchor = tagName === "a" && hasButtonSignal && hasColorModifier;
+    style = isColorCtaAnchor || (isRealButton && textLuminance !== null && textLuminance > 0.7) ? "fill" : "ghost";
   }
 
   const lowerSource = node.source.toLowerCase();
@@ -867,6 +933,9 @@ function inferComponentVariants(node: SerializedStyleNode): ComponentVariants {
   } else if (height >= 48) {
     size = "lg";
   }
+  if (tagName === "a" && hasButtonSignal && (normalizeLength(node.fontSize) ?? 0) >= 20) {
+    size = "lg";
+  }
 
   return { style, state, size };
 }
@@ -875,13 +944,17 @@ function matchAppliedTokens(node: SerializedStyleNode, tokens: DesignTokens): Ex
   const fillToken = findColorToken(tokens.colors, "fill", node.backgroundColor);
   const strokeToken = findColorToken(tokens.colors, "stroke", node.borderColor);
   const textToken = findColorToken(tokens.colors, "text", node.textColor);
+  const effectiveTextToken =
+    fillToken && textToken && normalizeColor(fillToken.value) === normalizeColor(textToken.value)
+      ? null
+      : textToken;
   const typographyToken = findTypographyToken(tokens.typography, node);
   const effectTokenIds = findEffectTokenIds(tokens.effects, node);
 
   return {
     fills: fillToken ? [fillToken.id] : [],
     strokes: strokeToken ? [strokeToken.id] : [],
-    text: textToken ? [textToken.id] : [],
+    text: effectiveTextToken ? [effectiveTextToken.id] : [],
     typography: typographyToken ? [typographyToken.id] : [],
     effects: effectTokenIds
   };
@@ -895,6 +968,7 @@ function inferPadding(node: SerializedStyleNode): AutoLayout["padding"] | undefi
   if (top === 0 && right === 0 && bottom === 0 && left === 0) return undefined;
   return { top, right, bottom, left };
 }
+
 
 function makeSpacingSignature(node: SerializedStyleNode): string {
   const padding = inferPadding(node);
