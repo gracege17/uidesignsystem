@@ -10,6 +10,16 @@ module.exports = {
           100: "#dbeafe",
           500: "#2563eb",
           600: "#1d4ed8"
+        },
+        notion: {
+          bg: "#FFFFFF",
+          surface: "#F7F7F5",
+          border: "#E9E9E7",
+          muted: "#91918E",
+          text: "#37352F",
+          "text-secondary": "#787774",
+          ink: "#37352F",
+          "ink-hover": "#1a1917"
         }
       },
       boxShadow: {

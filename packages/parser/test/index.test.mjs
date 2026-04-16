@@ -976,6 +976,118 @@ test("extractDesignSystem: Card with box shadow maps effect token", () => {
   assert.equal(effectToken.style, "drop-shadow");
 });
 
+test("extractDesignSystem: repeated cards with minor implementation differences group as one pattern", () => {
+  const result = extractDesignSystem([
+    {
+      source: "section.card.product",
+      tagName: "section",
+      classNames: ["card", "product"],
+      textContent: "Product card First card description",
+      childCount: 3,
+      width: 320,
+      height: 220,
+      display: "flex",
+      gap: 16,
+      paddingTop: 20,
+      paddingRight: 24,
+      paddingBottom: 20,
+      paddingLeft: 24,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      borderRadius: 16,
+      textColor: "rgb(15, 23, 42)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 400,
+      lineHeight: 24,
+      letterSpacing: 0
+    },
+    {
+      source: "section.card.pricing",
+      tagName: "section",
+      classNames: ["card", "pricing"],
+      textContent: "Pricing card Second card description",
+      childCount: 3,
+      width: 336,
+      height: 232,
+      display: "flex",
+      gap: 16,
+      paddingTop: 22,
+      paddingRight: 24,
+      paddingBottom: 22,
+      paddingLeft: 24,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(203, 213, 225)",
+      borderRadius: 16,
+      textColor: "rgb(30, 41, 59)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 400,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const cards = result.components.filter((component) => component.type === "Card");
+  assert.equal(cards.length, 1, "minor color, size, and padding differences should not split one repeated card pattern");
+});
+
+test("extractDesignSystem: differently padded buttons still remain separate variants", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.brand.compact",
+      tagName: "button",
+      classNames: ["button", "brand", "compact"],
+      textContent: "Buy now",
+      childCount: 1,
+      width: 124,
+      height: 48,
+      display: "flex",
+      paddingTop: 10,
+      paddingRight: 16,
+      paddingBottom: 10,
+      paddingLeft: 16,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      borderRadius: 16,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    },
+    {
+      source: "button.brand.roomy",
+      tagName: "button",
+      classNames: ["button", "brand", "roomy"],
+      textContent: "Buy now",
+      childCount: 1,
+      width: 156,
+      height: 48,
+      display: "flex",
+      paddingTop: 14,
+      paddingRight: 24,
+      paddingBottom: 14,
+      paddingLeft: 24,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      borderRadius: 16,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const buttons = result.components.filter((component) => component.type === "Button");
+  assert.equal(buttons.length, 2, "approximate grouping must not collapse button size variants yet");
+});
+
 // ─── Button <a> detection ────────────────────────────────────────────────────
 
 test("inferComponentType: small <a> with background and short text is a Button", () => {
@@ -1016,6 +1128,118 @@ test("inferComponentType: small <a> with background and short text is a Button",
 
   const buttons = result.components.filter((c) => c.type === "Button");
   assert.ok(buttons.length > 0, "small <a> with short label should be a Button");
+});
+
+test("extractDesignSystem: hidden injected controls are ignored", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button#cgw_action_btn",
+      tagName: "button",
+      classNames: ["cgw_action_btn"],
+      childCount: 0,
+      width: 12,
+      height: 2,
+      pageY: -9999
+    },
+    {
+      source: "a.cc-solid-lime.button",
+      tagName: "a",
+      classNames: ["cc-solid-lime", "button"],
+      href: "https://example.com/tickets",
+      textContent: "get tickets",
+      childCount: 1,
+      width: 196.09,
+      height: 51.66,
+      backgroundColor: "rgb(238, 247, 115)",
+      textColor: "rgb(27, 26, 24)",
+      borderRadius: 16.34,
+      fontFamily: "Roobert SemiMono, sans-serif",
+      fontSize: 22.08,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  assert.equal(result.components.some((component) => component.source === "button#cgw_action_btn"), false);
+  assert.equal(result.components.some((component) => component.source === "a.cc-solid-lime.button"), true);
+});
+
+test("extractDesignSystem: color modifier CTA anchors stay filled large buttons even when fill is not captured", () => {
+  const result = extractDesignSystem([
+    {
+      source: "a.cc-dragonfruit.button",
+      tagName: "a",
+      classNames: ["cc-dragonfruit", "button"],
+      href: "https://example.com/tickets",
+      textContent: "get tickets",
+      childCount: 1,
+      width: 194.94,
+      height: 28.08,
+      textColor: "rgb(70, 2, 47)",
+      fontFamily: "Roobert SemiMono, sans-serif",
+      fontSize: 22.08,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const button = result.components.find((component) => component.source === "a.cc-dragonfruit.button");
+  assert.ok(button, "color modifier CTA anchor should be extracted");
+  assert.equal(button.type, "Button");
+  assert.equal(button.variants.style, "fill");
+  assert.equal(button.variants.size, "lg");
+});
+
+test("extractDesignSystem: same-as-fill text color is not applied as component text token", () => {
+  const result = extractDesignSystem([
+    {
+      source: "div.card.ube",
+      tagName: "div",
+      classNames: ["card", "ube"],
+      childCount: 2,
+      width: 320,
+      height: 200,
+      backgroundColor: "rgb(200, 187, 251)",
+      borderRadius: 24,
+      paddingTop: 24,
+      paddingRight: 24,
+      paddingBottom: 24,
+      paddingLeft: 24,
+      textColor: "rgb(200, 187, 251)",
+      fontFamily: "Roobert, sans-serif",
+      fontSize: 22,
+      fontWeight: 400,
+      lineHeight: 26,
+      letterSpacing: 0
+    },
+    {
+      source: "div.card.ube-2",
+      tagName: "div",
+      classNames: ["card", "ube"],
+      childCount: 2,
+      width: 320,
+      height: 200,
+      backgroundColor: "rgb(200, 187, 251)",
+      borderRadius: 24,
+      paddingTop: 24,
+      paddingRight: 24,
+      paddingBottom: 24,
+      paddingLeft: 24,
+      textColor: "rgb(200, 187, 251)",
+      fontFamily: "Roobert, sans-serif",
+      fontSize: 22,
+      fontWeight: 400,
+      lineHeight: 26,
+      letterSpacing: 0
+    }
+  ]);
+
+  const card = result.components.find((component) => component.type === "Card");
+  assert.ok(card, "Card should be extracted");
+  assert.equal(card.tokens.fills.length, 1);
+  assert.equal(card.tokens.text.length, 0);
 });
 
 test("inferComponentType: tall <a> (hero banner) is NOT a Button", () => {
@@ -1513,4 +1737,137 @@ test("extractTokens: same style with different textAlign produces one token with
 
   assert.equal(tokens.typography.length, 1, "Same style with different alignment must produce one token");
   assert.equal(tokens.typography[0].textAlign, "left", "Dominant alignment (2x left vs 1x center) must win");
+});
+
+// ─── Regression tests from sculpt.clay.com debug output ──────────────────────
+// Real observed values. Prevents regressions for misclassification bugs found
+// on that page. Each test is named after the element that exposed the bug.
+
+test("inferComponentType: large CTA anchor (h=96px) is classified as Button, not Card", () => {
+  // sculpt.clay.com "Secure your spot" — a.w-inline-block, h=96px, fill background.
+  // Was misclassified as Card because isButtonLikeAnchor requires height <= 80.
+  const result = extractDesignSystem([{
+    source: "a.w-inline-block",
+    tagName: "a",
+    textContent: "Secure your spot",
+    backgroundColor: "rgb(27, 26, 24)",
+    textColor: "rgb(254, 253, 251)",
+    height: 96.06,
+    width: 571.63,
+    paddingTop: 26.5,
+    paddingRight: 39.75,
+    paddingBottom: 26.5,
+    paddingLeft: 39.75,
+    borderRadius: 35.33,
+    childCount: 2,
+    fontFamily: "Roobert, sans-serif",
+    fontSize: 22.08,
+    fontWeight: 400,
+    lineHeight: 26.5
+  }]);
+
+  const buttons = result.components.filter((c) => c.type === "Button");
+  const cards = result.components.filter((c) => c.type === "Card");
+  assert.equal(buttons.length, 1, "large CTA anchor should be a Button");
+  assert.equal(cards.length, 0, "large CTA anchor must not be misclassified as Card");
+});
+
+test("inferComponentType: wrapper anchor with 2px padding and no fill is not a Button", () => {
+  // sculpt.clay.com a.w-inline-block.button — h=26px, padding=2px all sides,
+  // no backgroundColor, no textColor. This is a Webflow clip wrapper, not a real button.
+  const result = extractDesignSystem([
+    {
+      source: "a.w-inline-block.button",
+      tagName: "a",
+      classNames: ["w-inline-block", "button"],
+      textContent: "get tickets",
+      height: 26.48,
+      width: 194.94,
+      paddingTop: 2,
+      paddingRight: 2,
+      paddingBottom: 2,
+      paddingLeft: 2,
+      childCount: 1,
+      fontFamily: "Roobert SemiMono, sans-serif",
+      fontSize: 22.08,
+      fontWeight: 600,
+      lineHeight: 26.5
+    }
+  ]);
+
+  const buttons = result.components.filter((c) => c.type === "Button");
+  assert.equal(buttons.length, 0, "wrapper anchor with 2px padding and no visual treatment must not become a Button");
+});
+
+test("hasNavigationConfidence: zero-height nav element is filtered out", () => {
+  // sculpt.clay.com a#w-node-... classified as Navigation with h=0px.
+  // A zero-height element is invisible and must not be kept as a component.
+  const result = extractDesignSystem([{
+    source: "a#w-node-abc123",
+    tagName: "a",
+    classNames: ["w-nav-brand"],
+    textContent: "",
+    height: 0,
+    width: 145.75,
+    landmark: "nav",
+    fontFamily: "Roobert, sans-serif",
+    fontSize: 16,
+    fontWeight: 400,
+    lineHeight: 19.2
+  }]);
+
+  const navComponents = result.components.filter((c) => c.type === "Navigation");
+  assert.equal(navComponents.length, 0, "zero-height navigation element must be filtered out");
+});
+
+test("hasContentBlockConfidence: full-viewport-width container is filtered out", () => {
+  // sculpt.clay.com div.section_content — w=1457px, treated as a page layout section,
+  // not a reusable component. Must not appear in components list.
+  const result = extractDesignSystem([
+    {
+      source: "div.section_content",
+      tagName: "div",
+      textContent: "Some content block text here",
+      height: 750,
+      width: 1457.5,
+      childCount: 3,
+      gap: 61.83,
+      fontFamily: "Roobert, sans-serif",
+      fontSize: 22.08,
+      fontWeight: 400,
+      lineHeight: 26.5,
+      textColor: "rgb(27, 26, 24)"
+    },
+    {
+      source: "div.section_content",
+      tagName: "div",
+      textContent: "Another section block here",
+      height: 680,
+      width: 1457.5,
+      childCount: 3,
+      gap: 61.83,
+      fontFamily: "Roobert, sans-serif",
+      fontSize: 22.08,
+      fontWeight: 400,
+      lineHeight: 26.5,
+      textColor: "rgb(27, 26, 24)"
+    },
+    {
+      source: "div.section_content",
+      tagName: "div",
+      textContent: "Third section block here",
+      height: 700,
+      width: 1457.5,
+      childCount: 3,
+      gap: 61.83,
+      fontFamily: "Roobert, sans-serif",
+      fontSize: 22.08,
+      fontWeight: 400,
+      lineHeight: 26.5,
+      textColor: "rgb(27, 26, 24)"
+    }
+  ]);
+
+  const contentBlocks = result.components.filter((c) => c.type === "ContentBlock");
+  assert.equal(contentBlocks.length, 0, "full-viewport-width containers must not become ContentBlock components");
 });
