@@ -13,6 +13,9 @@ import type {
   LayoutMetrics,
   TypographyToken
 } from "@extractor/types";
+import { extractPatternCandidates } from "./patterns/extractPatternCandidates.js";
+import { patternsToComponents } from "./patterns/toExtractedComponent.js";
+import type { LegacyComponentCandidate } from "./patterns/types.js";
 
 export interface SerializedStyleNode {
   source: string;
@@ -90,13 +93,6 @@ interface EffectCandidate {
   spreadRadius?: number;
   count: number;
   sources: string[];
-}
-
-interface ComponentCandidate {
-  type: ComponentType;
-  node: SerializedStyleNode;
-  count: number;
-  signature: string;
 }
 
 const GENERIC_SOURCE_TERMS = new Set([
@@ -283,39 +279,31 @@ export function extractComponents(
   nodes: SerializedStyleNode[] = [],
   tokens: DesignTokens = extractTokens(nodes)
 ): ExtractedComponent[] {
-  const candidates = collectComponentCandidates(nodes.filter((node) => !isRootLevelNode(node)));
-  const usedNames = new Set<string>();
+  const patterns = extractPatternCandidates(nodes.filter((node) => !isRootLevelNode(node)), {
+    inferVariants: inferComponentVariants,
+    normalizeColor,
+    normalizeFontFamily,
+    normalizeLength,
+    makeSpacingSignature,
+    makeStructureSignature,
+    inferSemanticStem,
+    isIgnoredComponentCandidate,
+    inferComponentType,
+    shouldKeepComponentCandidate
+  });
 
-  return candidates.map((candidate, index) => {
-    const variants = inferComponentVariants(candidate.node);
-    const name = inferComponentName(candidate, usedNames, index + 1);
-
-    return {
-      id: `component-${String(index + 1).padStart(3, "0")}`,
-      name,
-      type: candidate.type,
-      source: candidate.node.source,
-      description:
-        candidate.count > 1
-          ? `Detected ${candidate.count} matching instances from repeated DOM patterns.`
-          : "Detected from a strong structural component signal.",
-      variants,
-      tokens: matchAppliedTokens(candidate.node, tokens),
-      autoLayout: inferAutoLayout(candidate.node),
-      cornerRadius: normalizeLength(candidate.node.borderRadius) ?? undefined,
-      padding: inferPadding(candidate.node),
-      width: normalizeLength(candidate.node.width) ?? undefined,
-      height: normalizeLength(candidate.node.height) ?? undefined,
-      textContent: (() => { const t = candidate.node.textContent?.trim() ?? ""; return t.length > 0 && t.length <= 30 ? t : undefined; })(),
-      landmark: candidate.node.landmark,
-      pageY: candidate.node.pageY,
-      position: candidate.node.position !== "static" ? candidate.node.position : undefined
-    };
+  return patternsToComponents(patterns, tokens, {
+    inferComponentName,
+    inferComponentVariants,
+    matchAppliedTokens,
+    inferAutoLayout,
+    normalizeLength,
+    inferPadding
   });
 }
 
 function inferComponentName(
-  candidate: ComponentCandidate,
+  candidate: LegacyComponentCandidate,
   usedNames: Set<string>,
   index: number
 ): string {
@@ -335,55 +323,6 @@ function inferComponentName(
     usedNames,
     index
   );
-}
-
-function collectComponentCandidates(nodes: SerializedStyleNode[]): ComponentCandidate[] {
-  const grouped = new Map<string, ComponentCandidate>();
-
-  for (const node of nodes) {
-    if (isIgnoredComponentCandidate(node)) {
-      continue;
-    }
-
-    const type = inferComponentType(node);
-    if (type === "Unknown") {
-      continue;
-    }
-
-    const variants = inferComponentVariants(node);
-    const signature = [
-      type,
-      variants.style,
-      variants.size,
-      normalizeColor(node.backgroundColor) ?? "",
-      normalizeColor(node.borderColor) ?? "",
-      normalizeColor(node.textColor) ?? "",
-      normalizeFontFamily(node.fontFamily ?? "") || "",
-      normalizeLength(node.fontSize) ?? "",
-      makeSpacingSignature(node),
-      normalizeLength(node.borderRadius) ?? "",
-      makeStructureSignature(node),
-      inferSemanticStem([node.source], "component") ?? ""
-    ].join("|");
-
-    const existing = grouped.get(signature);
-    if (existing) {
-      existing.count += 1;
-      continue;
-    }
-
-    grouped.set(signature, { type, node, count: 1, signature });
-  }
-
-  return Array.from(grouped.values())
-    .filter((candidate) => shouldKeepComponentCandidate(candidate))
-    .sort((left, right) => {
-      if (right.count !== left.count) {
-        return right.count - left.count;
-      }
-
-      return left.type.localeCompare(right.type);
-    });
 }
 
 function isIgnoredComponentCandidate(node: SerializedStyleNode): boolean {
@@ -412,7 +351,7 @@ function isIgnoredComponentCandidate(node: SerializedStyleNode): boolean {
   return /\b(cgw|captcha|recaptcha|grecaptcha|intercom|launcher|widget)\b/.test(source);
 }
 
-function shouldKeepComponentCandidate(candidate: ComponentCandidate): boolean {
+function shouldKeepComponentCandidate(candidate: LegacyComponentCandidate): boolean {
   switch (candidate.type) {
     case "Button":
       return hasButtonConfidence(candidate.node);

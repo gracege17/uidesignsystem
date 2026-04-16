@@ -976,6 +976,118 @@ test("extractDesignSystem: Card with box shadow maps effect token", () => {
   assert.equal(effectToken.style, "drop-shadow");
 });
 
+test("extractDesignSystem: repeated cards with minor implementation differences group as one pattern", () => {
+  const result = extractDesignSystem([
+    {
+      source: "section.card.product",
+      tagName: "section",
+      classNames: ["card", "product"],
+      textContent: "Product card First card description",
+      childCount: 3,
+      width: 320,
+      height: 220,
+      display: "flex",
+      gap: 16,
+      paddingTop: 20,
+      paddingRight: 24,
+      paddingBottom: 20,
+      paddingLeft: 24,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(226, 232, 240)",
+      borderRadius: 16,
+      textColor: "rgb(15, 23, 42)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 400,
+      lineHeight: 24,
+      letterSpacing: 0
+    },
+    {
+      source: "section.card.pricing",
+      tagName: "section",
+      classNames: ["card", "pricing"],
+      textContent: "Pricing card Second card description",
+      childCount: 3,
+      width: 336,
+      height: 232,
+      display: "flex",
+      gap: 16,
+      paddingTop: 22,
+      paddingRight: 24,
+      paddingBottom: 22,
+      paddingLeft: 24,
+      backgroundColor: "rgb(255, 255, 255)",
+      borderColor: "rgb(203, 213, 225)",
+      borderRadius: 16,
+      textColor: "rgb(30, 41, 59)",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 400,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const cards = result.components.filter((component) => component.type === "Card");
+  assert.equal(cards.length, 1, "minor color, size, and padding differences should not split one repeated card pattern");
+});
+
+test("extractDesignSystem: differently padded buttons still remain separate variants", () => {
+  const result = extractDesignSystem([
+    {
+      source: "button.brand.compact",
+      tagName: "button",
+      classNames: ["button", "brand", "compact"],
+      textContent: "Buy now",
+      childCount: 1,
+      width: 124,
+      height: 48,
+      display: "flex",
+      paddingTop: 10,
+      paddingRight: 16,
+      paddingBottom: 10,
+      paddingLeft: 16,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      borderRadius: 16,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    },
+    {
+      source: "button.brand.roomy",
+      tagName: "button",
+      classNames: ["button", "brand", "roomy"],
+      textContent: "Buy now",
+      childCount: 1,
+      width: 156,
+      height: 48,
+      display: "flex",
+      paddingTop: 14,
+      paddingRight: 24,
+      paddingBottom: 14,
+      paddingLeft: 24,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgb(37, 99, 235)",
+      textColor: "rgb(255, 255, 255)",
+      borderRadius: 16,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 16,
+      fontWeight: 600,
+      lineHeight: 24,
+      letterSpacing: 0
+    }
+  ]);
+
+  const buttons = result.components.filter((component) => component.type === "Button");
+  assert.equal(buttons.length, 2, "approximate grouping must not collapse button size variants yet");
+});
+
 // ─── Button <a> detection ────────────────────────────────────────────────────
 
 test("inferComponentType: small <a> with background and short text is a Button", () => {
